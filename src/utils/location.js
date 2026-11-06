@@ -1,4 +1,4 @@
-import BackgroundGeolocation from 'react-native-background-geolocation';
+import BackgroundGeolocation from '../location/BackgroundLocation';
 import { Platform } from 'react-native';
 import { EventRegister } from 'react-native-event-listeners';
 import { checkMultiple, request, PERMISSIONS, RESULTS } from 'react-native-permissions';

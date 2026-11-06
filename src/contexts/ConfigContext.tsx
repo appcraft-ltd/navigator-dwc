@@ -15,6 +15,7 @@ export const ConfigProvider = ({ children }: { children: ReactNode }) => {
 
     const setInstanceLinkConfig = useCallback(
         (key, value) => {
+            if (toBoolean(config('INSTANCE_LOCKED', true))) return;
             switch (key) {
                 case 'API_HOST':
                 case 'FLEETBASE_HOST':
@@ -61,6 +62,16 @@ export const ConfigProvider = ({ children }: { children: ReactNode }) => {
 
     const resolveConnectionConfig = useCallback(
         (key, defaultValue = null) => {
+            if (toBoolean(config('INSTANCE_LOCKED', true))) {
+                return get({
+                    FLEETBASE_HOST: config('FLEETBASE_HOST'),
+                    FLEETBASE_KEY: '',
+                    SOCKETCLUSTER_HOST: config('SOCKETCLUSTER_HOST'),
+                    SOCKETCLUSTER_PORT: parseInt(config('SOCKETCLUSTER_PORT', '443')),
+                    SOCKETCLUSTER_SECURE: true,
+                    SOCKETCLUSTER_PATH: config('SOCKETCLUSTER_PATH', '/socketcluster/'),
+                }, key, defaultValue);
+            }
             const fullConfig = {
                 FLEETBASE_HOST: instanceLinkedFleetbaseHost ?? config('FLEETBASE_HOST'),
                 FLEETBASE_KEY: instanceLinkedFleetbaseKey ?? config('FLEETBASE_KEY'),

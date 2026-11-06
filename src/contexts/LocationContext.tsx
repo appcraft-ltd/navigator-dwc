@@ -1,7 +1,6 @@
 import React, { createContext, useState, useEffect, useCallback, useContext, useMemo } from 'react';
 import { AppState, Platform } from 'react-native';
-import BackgroundGeolocation from 'react-native-background-geolocation';
-import BackgroundFetch from 'react-native-background-fetch';
+import BackgroundGeolocation from '../location/BackgroundLocation';
 import { check, PERMISSIONS, RESULTS } from 'react-native-permissions';
 import { Place, Point } from '@fleetbase/sdk';
 import { isEmpty } from '../utils';
@@ -27,7 +26,7 @@ export const LocationProvider = ({ children }) => {
     const [location, setLocation] = useStorage(`${driver?.id ?? 'anon'}_location`, {});
     const [isTracking, setIsTracking] = useState(false);
     const [permissionStatus, setPermissionStatus] = useState(Platform.OS === 'web' ? RESULTS.GRANTED : RESULTS.DENIED);
-    const canTrackLocation = isLocationTrackingAllowed({ driver, isOnline, permissionStatus });
+    const canTrackLocation = isLocationTrackingAllowed({ driver, isOnline, permissionStatus }) && typeof authToken === 'string' && authToken.length > 0;
     const hasStoredLocation = !isEmpty(location);
 
     // Keep native tracking synchronized with permission changes made in Settings.
@@ -113,7 +112,6 @@ export const LocationProvider = ({ children }) => {
     // Callback to handle location updates.
     const onLocation = useCallback(
         (location) => {
-            console.log('[BackgroundGeolocation] onLocation:', location);
             setLocation(location);
         },
         [setLocation]
@@ -122,7 +120,6 @@ export const LocationProvider = ({ children }) => {
     // Callback to handle activity updates.
     const onMotionChange = useCallback(
         (event) => {
-            console.log('[BackgroundGeolocation] onMotionChange:', event);
             if (event.location) {
                 onLocation(event.location);
             }
@@ -132,7 +129,8 @@ export const LocationProvider = ({ children }) => {
 
     // Callback to handle location errors.
     const onLocationError = useCallback((error) => {
-        console.warn('[BackgroundGeolocation] onLocationError:', error);
+        if (error?.code !== 'LOCATION_UPLOAD_UNAVAILABLE') setIsTracking(false);
+        console.warn('[Location] update unavailable');
     }, []);
 
     // Function to start tracking.
@@ -141,9 +139,8 @@ export const LocationProvider = ({ children }) => {
 
         BackgroundGeolocation.start(() => {
             setIsTracking(true);
-            console.log('[BackgroundGeolocation] Tracking started');
-        });
-    }, [canTrackLocation]);
+        }, onLocationError);
+    }, [canTrackLocation, onLocationError]);
 
     // Function to stop tracking.
     const stopTracking = useCallback(() => {
@@ -167,14 +164,14 @@ export const LocationProvider = ({ children }) => {
                 backgroundPermissionRationale: {
                     title: 'Allow Fleetbase Navigator to access your location',
                     message:
-                        'Fleetbase Navigator collects precise location data to enable real-time driver tracking and order progress updates for your organization’s dispatchers and operations team, even when the app is closed or not in use. Location is collected while you are online and is sent securely to Fleetbase.',
+                        'Fleetbase Navigator collects precise location data to enable real-time driver tracking and order progress updates for your organization’s dispatchers and operations team, while the app is minimized and you are online. Android displays a location-sharing notification. After force-stop or restart, reopen the app to resume.',
                     positiveAction: 'Allow',
                     negativeAction: 'Deny',
                 },
                 desiredAccuracy: BackgroundGeolocation.DESIRED_ACCURACY_HIGH,
                 distanceFilter: 10,
-                stopOnTerminate: false,
-                startOnBoot: true,
+                stopOnTerminate: true,
+                startOnBoot: false,
                 stopTimeout: 1,
                 debug: false,
                 ...getHttpConfig(),
@@ -184,7 +181,8 @@ export const LocationProvider = ({ children }) => {
                 if (isActive) {
                     startTracking();
                 }
-            }
+            },
+            onLocationError
         );
 
         // Subscribe to location events.
@@ -200,36 +198,11 @@ export const LocationProvider = ({ children }) => {
         };
     }, [canTrackLocation, onLocation, onLocationError, onMotionChange, getHttpConfig, startTracking, stopTracking]);
 
-    // Configure BackgroundFetch for periodic tasks.
+    // The native foreground service owns periodic updates, including when JS
+    // is suspended. A first current fix keeps the existing map immediately useful.
     useEffect(() => {
-        if (!canTrackLocation) {
-            BackgroundFetch.stop();
-            return;
-        }
-
-        BackgroundFetch.configure(
-            {
-                minimumFetchInterval: 5,
-                stopOnTerminate: false,
-                startOnBoot: true,
-            },
-            async (taskId) => {
-                await trackLocation();
-                BackgroundFetch.finish(taskId);
-            },
-            (error) => {
-                console.warn('[BackgroundFetch] failed to configure:', error);
-            }
-        );
-
-        if (!hasStoredLocation && driver) {
-            trackLocation();
-        }
-
-        return () => {
-            BackgroundFetch.stop();
-        };
-    }, [canTrackLocation, driver?.id, hasStoredLocation, trackLocation]);
+        if (canTrackLocation && !hasStoredLocation) trackLocation();
+    }, [canTrackLocation, hasStoredLocation, trackLocation]);
 
     // Memoize the context value to prevent unnecessary re-renders.
     const value = useMemo(

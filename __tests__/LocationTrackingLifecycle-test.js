@@ -1,8 +1,7 @@
 import React from 'react';
 import ReactTestRenderer from 'react-test-renderer';
 import { View } from 'react-native';
-import BackgroundGeolocation from 'react-native-background-geolocation';
-import BackgroundFetch from 'react-native-background-fetch';
+import BackgroundGeolocation from '../src/location/BackgroundLocation';
 import { check, RESULTS } from 'react-native-permissions';
 import { LocationProvider, isLocationTrackingAllowed } from '../src/contexts/LocationContext';
 
@@ -19,7 +18,7 @@ jest.mock('react-native-permissions', () => ({
     RESULTS: { DENIED: 'denied', BLOCKED: 'blocked', GRANTED: 'granted' },
 }));
 
-jest.mock('react-native-background-geolocation', () => ({
+jest.mock('../src/location/BackgroundLocation', () => ({
     __esModule: true,
     default: {
         DESIRED_ACCURACY_HIGH: 1,
@@ -32,15 +31,6 @@ jest.mock('react-native-background-geolocation', () => ({
     },
 }));
 
-jest.mock('react-native-background-fetch', () => ({
-    __esModule: true,
-    default: {
-        configure: jest.fn(),
-        finish: jest.fn(),
-        stop: jest.fn(),
-    },
-}));
-
 jest.mock('@fleetbase/sdk', () => ({
     Place: class Place {},
     Point: class Point {},
@@ -50,7 +40,7 @@ jest.mock('../src/contexts/AuthContext', () => ({
     useAuth: () => mockAuthState,
 }));
 
-jest.mock('../src/hooks/use-storage', () => () => [{}, mockSetLocation]);
+jest.mock('../src/hooks/use-storage', () => (key) => [key === '_driver_token' ? 'session-token' : {}, mockSetLocation]);
 jest.mock('../src/hooks/use-fleetbase', () => () => ({ adapter: mockAdapter }));
 jest.mock('../src/utils', () => ({
     isEmpty: (value) => !value || Object.keys(value).length === 0,
@@ -79,14 +69,13 @@ describe('location tracking lifecycle', () => {
         expect(isLocationTrackingAllowed({ driver, isOnline: true, permissionStatus: RESULTS.DENIED })).toBe(false);
     });
 
-    test('starts native geolocation and background fetch only for an authenticated online driver with permission', async () => {
+    test('starts native geolocation only for an authenticated online driver with permission', async () => {
         await ReactTestRenderer.act(async () => {
             ReactTestRenderer.create(renderProvider());
         });
 
         expect(BackgroundGeolocation.ready).toHaveBeenCalled();
         expect(BackgroundGeolocation.start).toHaveBeenCalled();
-        expect(BackgroundFetch.configure).toHaveBeenCalled();
     });
 
     test('does not initialize tracking when permission is denied', async () => {
@@ -98,12 +87,10 @@ describe('location tracking lifecycle', () => {
 
         expect(BackgroundGeolocation.ready).not.toHaveBeenCalled();
         expect(BackgroundGeolocation.start).not.toHaveBeenCalled();
-        expect(BackgroundFetch.configure).not.toHaveBeenCalled();
         expect(BackgroundGeolocation.stop).toHaveBeenCalled();
-        expect(BackgroundFetch.stop).toHaveBeenCalled();
     });
 
-    test('stops geolocation and background fetch when the driver goes offline or logs out', async () => {
+    test('stops geolocation when the driver goes offline or logs out', async () => {
         let renderer;
         await ReactTestRenderer.act(async () => {
             renderer = ReactTestRenderer.create(renderProvider());
@@ -116,7 +103,6 @@ describe('location tracking lifecycle', () => {
         });
 
         expect(BackgroundGeolocation.stop).toHaveBeenCalled();
-        expect(BackgroundFetch.stop).toHaveBeenCalled();
 
         jest.clearAllMocks();
         mockAuthState = { ...mockAuthState, driver: null };
@@ -125,6 +111,5 @@ describe('location tracking lifecycle', () => {
         });
 
         expect(BackgroundGeolocation.stop).toHaveBeenCalled();
-        expect(BackgroundFetch.stop).toHaveBeenCalled();
     });
 });

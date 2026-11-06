@@ -2,6 +2,7 @@ import React, { createContext, useContext, useEffect, useState, useRef } from 'r
 import { PermissionsAndroid, Platform } from 'react-native';
 import { Notifications } from 'react-native-notifications';
 import useStorage from '../hooks/use-storage';
+import { config, toBoolean } from '../utils';
 
 const requestAndroidNotificationPermission = async () => {
     if (Platform.OS === 'android' && Platform.Version >= 33) {
@@ -32,6 +33,7 @@ export const NotificationProvider = ({ children }) => {
     };
 
     useEffect(() => {
+        if (Platform.OS === 'android' && !toBoolean(config('PUSH_ENABLED', false))) return;
         const registerRemoteNotifications = async () => {
             await requestAndroidNotificationPermission();
             Notifications.registerRemoteNotifications();

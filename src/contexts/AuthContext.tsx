@@ -52,6 +52,7 @@ export const AuthProvider = ({ children }) => {
 
     // Restore session on app load
     useEffect(() => {
+        if (!fleetbase) return;
         if (storedDriver) {
             if (storedDriver.token) {
                 setAuthToken(storedDriver.token);
@@ -319,8 +320,6 @@ export const AuthProvider = ({ children }) => {
 
             try {
                 const { driver } = await adapter.post(`drivers/${state.driver.id}/switch-organization`, { next: organization.id });
-                console.log('[switchOrganization #driver]', driver);
-                console.log('[switchOrganization #driver.token]', driver.token);
                 createDriverSession(driver);
             } catch (err) {
                 console.warn('Error trying to switch driver organization:', err);

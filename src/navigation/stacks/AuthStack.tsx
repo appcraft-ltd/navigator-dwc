@@ -1,4 +1,4 @@
-import LoginScreen from '../../screens/LoginScreen';
+import LoginScreen from '../../screens/EmailLoginScreen';
 import PhoneLoginScreen from '../../screens/PhoneLoginScreen';
 import PhoneLoginVerifyScreen from '../../screens/PhoneLoginVerifyScreen';
 import CreateAccountScreen from '../../screens/CreateAccountScreen';

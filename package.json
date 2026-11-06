@@ -161,5 +161,6 @@
             "<rootDir>/.claude/worktrees/",
             "<rootDir>/legacy/"
         ]
-    }
+    },
+    "packageManager": "yarn@3.6.4"
 }
