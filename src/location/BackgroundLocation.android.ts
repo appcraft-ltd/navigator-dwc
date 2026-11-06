@@ -21,5 +21,6 @@ export default {
         const error = onError ? events.addListener('DwcLocationError', onError) : null;
         return { remove: () => { location.remove(); error?.remove(); } };
     },
+    onUpload: (listener) => events.addListener('DwcLocationUpload', listener),
     onMotionChange: () => ({ remove: () => {} }),
 };

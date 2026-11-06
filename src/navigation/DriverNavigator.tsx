@@ -77,7 +77,7 @@ function getTabConfig(name, key, defaultValue = null) {
 }
 
 function createTabScreens() {
-    const tabs = toArray(navigatorConfig('driverNavigator.tabs', 'DriverDashboardTab,DriverTaskTab,DriverReportTab,DriverChatTab,DriverAccountTab'));
+    const tabs = isAndroid ? ['DriverTaskTab', 'DriverDashboardTab', 'DriverAccountTab'] : toArray(navigatorConfig('driverNavigator.tabs', 'DriverDashboardTab,DriverTaskTab,DriverReportTab,DriverChatTab,DriverAccountTab'));
     const screens = {
         DriverDashboardTab: {
             screen: DriverDashboardTab,
@@ -497,6 +497,7 @@ const DriverAccountTab = createNativeStackNavigator({
 });
 
 const DriverNavigator = createBottomTabNavigator({
+    initialRouteName: isAndroid ? 'DriverTaskTab' : 'DriverDashboardTab',
     layout: DriverLayout,
     screenOptions: ({ route, navigation }) => {
         const theme = useTheme();
@@ -505,6 +506,7 @@ const DriverNavigator = createBottomTabNavigator({
         const blurredColor = theme.tabIconBlur.val;
 
         return {
+            headerShown: !isAndroid,
             headerTitle: '',
             headerLeft: (props) => (
                 <View pl='$3'>
@@ -574,7 +576,7 @@ const DriverNavigator = createBottomTabNavigator({
                 return {
                     marginTop: isAndroid ? 4 : 15,
                     fontSize: isAndroid ? 13 : 15,
-                    fontWeight: focued ? 600 : 300,
+                    fontWeight: focused ? 600 : 300,
                 };
             },
         };

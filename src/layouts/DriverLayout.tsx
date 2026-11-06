@@ -1,5 +1,7 @@
 import { useEffect } from 'react';
-import { View } from 'react-native';
+import { View, Platform } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTheme } from 'tamagui';
 import { useNavigation } from '@react-navigation/native';
 import { later } from '../utils';
 import { useNotification } from '../contexts/NotificationContext';
@@ -21,6 +23,8 @@ const getCurrentScreen = (tabNavigation) => {
 };
 
 const DriverLayout = ({ children, state, descriptors, navigation: tabNavigation }) => {
+    const insets = useSafeAreaInsets();
+    const theme = useTheme();
     const navigation = useNavigation();
     const { fleetbase } = useFleetbase();
     const { getChannel } = useChat();
@@ -39,7 +43,7 @@ const DriverLayout = ({ children, state, descriptors, navigation: tabNavigation 
             const id = payload.id;
             const type = payload.type;
 
-            if (type === 'chat_message_received' && action === 'opened') {
+            if (Platform.OS !== 'android' && type === 'chat_message_received' && action === 'opened') {
                 try {
                     const chatChannelId = payload.channel;
                     const channel = await getChannel(chatChannelId);
@@ -106,7 +110,7 @@ const DriverLayout = ({ children, state, descriptors, navigation: tabNavigation 
         };
     }, [addNotificationListener, removeNotificationListener, fleetbase, tabNavigation, navigation]);
 
-    return <View style={{ width: '100%', height: '100%', flex: 1 }}>{children}</View>;
+    return <View style={{ width: '100%', height: '100%', flex: 1, backgroundColor: theme.background.val, paddingTop: Platform.OS === 'android' ? insets.top : 0 }}>{children}</View>;
 };
 
 export default DriverLayout;

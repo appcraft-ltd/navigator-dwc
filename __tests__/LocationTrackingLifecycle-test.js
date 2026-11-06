@@ -3,7 +3,7 @@ import ReactTestRenderer from 'react-test-renderer';
 import { View } from 'react-native';
 import BackgroundGeolocation from '../src/location/BackgroundLocation';
 import { check, RESULTS } from 'react-native-permissions';
-import { LocationProvider, isLocationTrackingAllowed } from '../src/contexts/LocationContext';
+import { LocationProvider, isLocationTrackingAllowed, useLocation } from '../src/contexts/LocationContext';
 
 let mockAuthState;
 const mockSetLocation = jest.fn();
@@ -25,6 +25,7 @@ jest.mock('../src/location/BackgroundLocation', () => ({
         getCurrentPosition: jest.fn(),
         onLocation: jest.fn(() => ({ remove: jest.fn() })),
         onMotionChange: jest.fn(() => ({ remove: jest.fn() })),
+        onUpload: jest.fn(() => ({ remove: jest.fn() })),
         ready: jest.fn((config, callback) => callback({ enabled: false })),
         start: jest.fn((callback) => callback()),
         stop: jest.fn((callback) => callback()),
@@ -46,10 +47,12 @@ jest.mock('../src/utils', () => ({
     isEmpty: (value) => !value || Object.keys(value).length === 0,
 }));
 
+let latestLocationState;
+const LocationProbe = () => { latestLocationState = useLocation(); return <View />; };
 const driver = { id: 'driver-1' };
 const renderProvider = () => (
     <LocationProvider>
-        <View />
+        <LocationProbe />
     </LocationProvider>
 );
 
@@ -112,4 +115,17 @@ describe('location tracking lifecycle', () => {
 
         expect(BackgroundGeolocation.stop).toHaveBeenCalled();
     });
+    test('upload error survives a local fix and clears only after an acknowledged upload', async () => {
+        let renderer;
+        await ReactTestRenderer.act(async () => { renderer = ReactTestRenderer.create(renderProvider()); });
+        await ReactTestRenderer.act(async () => { BackgroundGeolocation.onLocation.mock.calls[0][1]({ code: 'LOCATION_UPLOAD_UNAVAILABLE' }); });
+        expect(latestLocationState.isTracking).toBe(true);
+        expect(latestLocationState.trackingError).toBe('LOCATION_UPLOAD_UNAVAILABLE');
+        await ReactTestRenderer.act(async () => { BackgroundGeolocation.onLocation.mock.calls[0][0]({ coords: { latitude: 1, longitude: 2 } }); });
+        expect(latestLocationState.trackingError).toBe('LOCATION_UPLOAD_UNAVAILABLE');
+        await ReactTestRenderer.act(async () => { BackgroundGeolocation.onUpload.mock.calls[0][0](); });
+        expect(latestLocationState.trackingError).toBe(null);
+        await ReactTestRenderer.act(async () => renderer.unmount());
+    });
+
 });

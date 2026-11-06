@@ -25,6 +25,7 @@ export const LocationProvider = ({ children }) => {
     const [authToken] = useStorage('_driver_token');
     const [location, setLocation] = useStorage(`${driver?.id ?? 'anon'}_location`, {});
     const [isTracking, setIsTracking] = useState(false);
+    const [trackingError, setTrackingError] = useState(null);
     const [permissionStatus, setPermissionStatus] = useState(Platform.OS === 'web' ? RESULTS.GRANTED : RESULTS.DENIED);
     const canTrackLocation = isLocationTrackingAllowed({ driver, isOnline, permissionStatus }) && typeof authToken === 'string' && authToken.length > 0;
     const hasStoredLocation = !isEmpty(location);
@@ -54,6 +55,13 @@ export const LocationProvider = ({ children }) => {
         };
     }, []);
 
+    const onLocationError = useCallback((error) => {
+        const code = typeof error?.code === 'string' ? error.code : 'LOCATION_UNAVAILABLE';
+        setTrackingError(code);
+        if (Platform.OS !== 'android' || (code !== 'LOCATION_UPLOAD_UNAVAILABLE' && code !== 'LOCATION_TIMEOUT' && code !== 'LOCATION_UNAVAILABLE')) setIsTracking(false);
+        console.warn('[Location] update unavailable');
+    }, []);
+
     // Manually track location
     const trackLocation = useCallback(async () => {
         if (!canTrackLocation) return;
@@ -69,9 +77,9 @@ export const LocationProvider = ({ children }) => {
             setLocation(location);
             trackDriver(location.coords);
         } catch (error) {
-            console.warn('Error attempting to track and update location:', error);
+            onLocationError(error);
         }
-    }, [canTrackLocation, trackDriver, setLocation]);
+    }, [canTrackLocation, trackDriver, setLocation, onLocationError]);
 
     // Get the drivers location as a Place
     const getDriverLocationAsPlace = useCallback(
@@ -113,6 +121,7 @@ export const LocationProvider = ({ children }) => {
     const onLocation = useCallback(
         (location) => {
             setLocation(location);
+            setTrackingError((current) => ['LOCATION_TIMEOUT', 'LOCATION_UNAVAILABLE'].includes(current) ? null : current);
         },
         [setLocation]
     );
@@ -127,16 +136,11 @@ export const LocationProvider = ({ children }) => {
         [onLocation]
     );
 
-    // Callback to handle location errors.
-    const onLocationError = useCallback((error) => {
-        if (error?.code !== 'LOCATION_UPLOAD_UNAVAILABLE') setIsTracking(false);
-        console.warn('[Location] update unavailable');
-    }, []);
-
     // Function to start tracking.
     const startTracking = useCallback(() => {
         if (!canTrackLocation) return;
 
+        setTrackingError(null);
         BackgroundGeolocation.start(() => {
             setIsTracking(true);
         }, onLocationError);
@@ -146,6 +150,7 @@ export const LocationProvider = ({ children }) => {
     const stopTracking = useCallback(() => {
         BackgroundGeolocation.stop(() => {
             setIsTracking(false);
+            setTrackingError(null);
             console.log('[BackgroundGeolocation] Tracking stopped');
         });
     }, []);
@@ -190,6 +195,7 @@ export const LocationProvider = ({ children }) => {
 
         // Subscribe to motion and activity events.
         subscriptions.push(BackgroundGeolocation.onMotionChange(onMotionChange));
+        if (BackgroundGeolocation.onUpload) subscriptions.push(BackgroundGeolocation.onUpload(() => setTrackingError(null)));
 
         // Clean up the listener when unmounting.
         return () => {
@@ -206,8 +212,8 @@ export const LocationProvider = ({ children }) => {
 
     // Memoize the context value to prevent unnecessary re-renders.
     const value = useMemo(
-        () => ({ location, isTracking, startTracking, stopTracking, getDriverLocationAsPlace, trackLocation }),
-        [location, isTracking, startTracking, stopTracking, getDriverLocationAsPlace, trackLocation]
+        () => ({ location, isTracking, trackingError, permissionStatus, startTracking, stopTracking, getDriverLocationAsPlace, trackLocation }),
+        [location, isTracking, trackingError, permissionStatus, startTracking, stopTracking, getDriverLocationAsPlace, trackLocation]
     );
 
     return <LocationContext.Provider value={value}>{children}</LocationContext.Provider>;

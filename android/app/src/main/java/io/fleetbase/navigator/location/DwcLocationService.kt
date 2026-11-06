@@ -9,6 +9,7 @@ import android.os.IBinder
 import android.os.Looper
 import com.google.android.gms.location.*
 import com.facebook.react.bridge.Promise
+import com.facebook.react.bridge.Arguments
 import io.fleetbase.navigator.MainActivity
 import io.fleetbase.navigator.R
 import org.json.JSONObject
@@ -125,7 +126,10 @@ class DwcLocationService : Service() {
                             stopSelf()
                         }
                     }
-                } else if (status !in 200..299) DwcLocationModule.locationError("LOCATION_UPLOAD_UNAVAILABLE")
+                } else if (generation == version) {
+                    if (status in 200..299) DwcLocationModule.emit("DwcLocationUpload", Arguments.createMap())
+                    else DwcLocationModule.locationError("LOCATION_UPLOAD_UNAVAILABLE")
+                }
             } catch (_: Exception) {
                 if (generation == version) DwcLocationModule.locationError("LOCATION_UPLOAD_UNAVAILABLE")
             } finally {

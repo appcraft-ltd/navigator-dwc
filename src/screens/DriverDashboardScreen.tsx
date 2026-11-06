@@ -6,6 +6,8 @@ import { humanize } from 'inflected';
 import { get } from '../utils';
 import OdometerNumber from '../components/OdometerNumber';
 import useAppTheme from '../hooks/use-app-theme';
+import { Platform, ScrollView } from 'react-native';
+import DriverTrackingControl from '../components/DriverTrackingControl';
 
 const WidgetContainer = ({ px = '$4', py = '$4', children, ...props }) => {
     const { isDarkMode } = useAppTheme();
@@ -24,9 +26,10 @@ const DriverDashboardScreen = () => {
 
     return (
         <YStack flex={1} bg='$background'>
-            <YStack flex={1} padding='$4' gap='$4'>
+            <ScrollView contentContainerStyle={{ padding: 16, gap: 16 }}>
                 <YStack space='$4'>
                     <WidgetContainer>
+                        {Platform.OS === 'android' ? <DriverTrackingControl /> : (
                         <XStack>
                             <YStack flex={1}>
                                 <Text color='$textPrimary'>Tracking:</Text>
@@ -35,6 +38,7 @@ const DriverDashboardScreen = () => {
                                 <Text color={isTracking ? '$successBorder' : '$textSecondary'}>{isTracking ? 'Yes' : 'No'}</Text>
                             </YStack>
                         </XStack>
+                        )}
                     </WidgetContainer>
                     <WidgetContainer>
                         <Text color='$textPrimary' fontWeight='bold' mb='$3'>
@@ -76,7 +80,7 @@ const DriverDashboardScreen = () => {
                         </YStack>
                     </WidgetContainer>
                 </XStack>
-            </YStack>
+            </ScrollView>
         </YStack>
     );
 };

@@ -5,6 +5,22 @@ with the server connection bound into the signed app. Drivers do not enter a ser
 API key or connection configuration. An active existing driver profile and its email
 address in Fleetbase are required. Installing the app does not create an account.
 
+## Android 0.1.1 interface
+
+The bottom navigation is Orders, Dash and Account. Orders opens first. The global
+Navigator/version header is hidden on Android; screen-specific back/close controls
+remain available. Dash has the existing Online/Offline availability action with an
+explicit explanation and a separate tracking indicator. Failed availability changes
+retain the previous confirmed setting. GPS permission/start/session/upload errors
+are shown separately; an upload error clears after the native service acknowledges
+a successful upload. Existing Orders and Account screen contents are unchanged.
+
+Focused tests cover status changes, duplicate requests, refusal, permission and
+upload recovery. The actual Dash and tab navigation are visually checked on an
+Android emulator using a separate QA package with synthetic states and no network
+or driver session. QA fixtures are outside the release source and APK. Real road,
+battery and operational acceptance remain pending as described below.
+
 ## Source and verification
 
 Fork of Fleetbase Navigator v2.0.12 (`0da77ce050ad4621efc0ede115c6e2692cda2c8e`).
