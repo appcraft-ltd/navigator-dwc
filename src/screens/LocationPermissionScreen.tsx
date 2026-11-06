@@ -2,7 +2,7 @@ import React, { useState, useCallback } from 'react';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Platform, Linking } from 'react-native';
-import { request, check, PERMISSIONS, RESULTS } from 'react-native-permissions';
+import { request, requestMultiple, check, PERMISSIONS, RESULTS } from 'react-native-permissions';
 import { Button, Text, YStack, Image, XStack, AlertDialog } from 'tamagui';
 import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
 import { faMapMarkerAlt } from '@fortawesome/free-solid-svg-icons';
@@ -62,7 +62,9 @@ const LocationPermissionScreen: React.FC = () => {
 
         const perm = Platform.OS === 'ios' ? PERMISSIONS.IOS.LOCATION_WHEN_IN_USE : PERMISSIONS.ANDROID.ACCESS_FINE_LOCATION;
 
-        const status = await request(perm);
+        const status = Platform.OS === 'android' && Number(Platform.Version) >= 31
+            ? (await requestMultiple([PERMISSIONS.ANDROID.ACCESS_COARSE_LOCATION, PERMISSIONS.ANDROID.ACCESS_FINE_LOCATION]))[PERMISSIONS.ANDROID.ACCESS_FINE_LOCATION]
+            : await request(perm);
         if (status === RESULTS.GRANTED) {
             return finish();
         }
@@ -89,7 +91,7 @@ const LocationPermissionScreen: React.FC = () => {
                 {t('LocationPermissionScreen.enableLocationServices')}
             </Text>
             <Text color='$textSecondary' fontSize='$4' textAlign='center' mb='$3'>
-                {t('LocationPermissionScreen.enableLocationPrompt')}
+                {Platform.OS === 'android' ? 'FullSend Driver shares your location with your dispatch team while you are online, including when the app is minimized. Android shows a location-sharing notification. After a force-stop or restart, reopen the app to resume.' : t('LocationPermissionScreen.enableLocationPrompt')}
             </Text>
 
             <Button size='$3' variant='ghost' mb='$4' onPress={openPrivacyPolicy} accessibilityRole='link'>

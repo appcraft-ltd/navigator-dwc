@@ -1,7 +1,7 @@
 import React from 'react';
 import ReactTestRenderer from 'react-test-renderer';
 import { Linking, Pressable, Text as NativeText, View } from 'react-native';
-import { check, request, PERMISSIONS, RESULTS } from 'react-native-permissions';
+import { check, request, requestMultiple, PERMISSIONS, RESULTS } from 'react-native-permissions';
 import LocationPermissionScreen from '../src/screens/LocationPermissionScreen';
 
 const mockNavigation = { reset: jest.fn() };
@@ -18,8 +18,9 @@ jest.mock('react-native-safe-area-context', () => ({
 jest.mock('react-native-permissions', () => ({
     check: jest.fn(),
     request: jest.fn(),
+    requestMultiple: jest.fn(),
     PERMISSIONS: {
-        ANDROID: { ACCESS_FINE_LOCATION: 'android.permission.ACCESS_FINE_LOCATION' },
+        ANDROID: { ACCESS_FINE_LOCATION: 'android.permission.ACCESS_FINE_LOCATION', ACCESS_COARSE_LOCATION: 'android.permission.ACCESS_COARSE_LOCATION' },
         IOS: { LOCATION_WHEN_IN_USE: 'ios.permission.LOCATION_WHEN_IN_USE' },
     },
     RESULTS: { DENIED: 'denied', BLOCKED: 'blocked', GRANTED: 'granted' },
@@ -87,6 +88,7 @@ describe('LocationPermissionScreen', () => {
     beforeEach(() => {
         jest.clearAllMocks();
         Object.defineProperty(require('react-native').Platform, 'OS', { configurable: true, value: 'android' });
+        Object.defineProperty(require('react-native').Platform, 'Version', { configurable: true, value: 30 });
         check.mockResolvedValue(RESULTS.DENIED);
         request.mockResolvedValue(RESULTS.DENIED);
     });
@@ -98,9 +100,9 @@ describe('LocationPermissionScreen', () => {
         });
 
         const renderedText = textFrom(renderer.root);
-        expect(renderedText).toContain('collects precise location data');
-        expect(renderedText).toContain('even when the app is closed or not in use');
-        expect(renderedText).toContain('dispatchers and operations team');
+        expect(renderedText).toContain('while you are online');
+        expect(renderedText).toContain('Android shows a location-sharing notification');
+        expect(renderedText).toContain('dispatch team');
         expect(renderedText).not.toContain('Skip for now');
         expect(request).not.toHaveBeenCalled();
 
@@ -111,6 +113,17 @@ describe('LocationPermissionScreen', () => {
 
         expect(request).toHaveBeenCalledWith(PERMISSIONS.ANDROID.ACCESS_FINE_LOCATION);
         expect(mockNavigation.reset).not.toHaveBeenCalled();
+    });
+
+
+    test('Android 12+ requests approximate and precise permission together before continuing', async () => {
+        Object.defineProperty(require('react-native').Platform, 'Version', { configurable: true, value: 35 });
+        requestMultiple.mockResolvedValue({ [PERMISSIONS.ANDROID.ACCESS_COARSE_LOCATION]: RESULTS.GRANTED, [PERMISSIONS.ANDROID.ACCESS_FINE_LOCATION]: RESULTS.GRANTED });
+        let renderer;
+        await ReactTestRenderer.act(async () => { renderer = ReactTestRenderer.create(<LocationPermissionScreen />); });
+        await ReactTestRenderer.act(async () => { await findButton(renderer.root, 'Allow location and continue').props.onPress(); });
+        expect(requestMultiple).toHaveBeenCalledWith([PERMISSIONS.ANDROID.ACCESS_COARSE_LOCATION, PERMISSIONS.ANDROID.ACCESS_FINE_LOCATION]);
+        expect(mockNavigation.reset).toHaveBeenCalledWith({ index: 0, routes: [{ name: 'Boot' }] });
     });
 
     test('checks the Android permission on focus and continues only after it is granted', async () => {

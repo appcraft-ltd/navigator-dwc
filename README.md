@@ -1,3 +1,16 @@
+# FullSend Driver — Android fork
+
+Android beta for FullSend Fleetbase: drivers sign in with their existing email and
+a six-digit code. The server is already bound into the signed app, with no
+connection configuration or shared company API key. Android GPS uses our native
+foreground service in place of Transistorsoft.
+
+Download the APK from [Releases](https://github.com/appcraft-ltd/navigator-dwc/releases).
+See [DWC-ANDROID.md](DWC-ANDROID.md) for build details, validation and beta limits.
+The original Navigator documentation and license are retained below.
+
+---
+
 <p align="center">
   <img src="https://flb-assets.s3.ap-southeast-1.amazonaws.com/static/fleetbase-logo-svg.svg" width="380" height="100" />
 </p>

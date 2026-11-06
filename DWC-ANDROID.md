@@ -1,71 +1,64 @@
-# FullSend Driver Android fork
+# FullSend Driver Android beta
 
-Status: **draft source; not a driver release**. No production login, phone GPS
-acceptance, signed APK, or public APK download is claimed.
+First release scope: email-code sign-in to the existing FullSend Fleetbase instance,
+with the server connection bound into the signed app. Drivers do not enter a server,
+API key or connection configuration. An active existing driver profile and its email
+address in Fleetbase are required. Installing the app does not create an account.
 
-Upstream: Fleetbase Navigator v2.0.12,
-`0da77ce050ad4621efc0ede115c6e2692cda2c8e`. Original AGPL license and notices
-remain in LICENSE.md. The corresponding modified source remains in this fork.
+## Source and verification
 
-## First-install flow
+Fork of Fleetbase Navigator v2.0.12 (`0da77ce050ad4621efc0ede115c6e2692cda2c8e`).
+Original AGPL license and notices are preserved in LICENSE.md. Modified Android
+source is public in this repository; the release tag identifies its exact source.
 
-The signed build supplies the approved HTTPS API and socket addresses. Drivers
-enter their email, then the six-digit code sent by Fleetbase. There is no
-connection-config step. Incoming configuration links are ignored. No organization
-API credential, server mail key or signing credential belongs in the APK.
+The client uses POST `/v1/navigator/auth/email` and `/v1/navigator/auth/verify`.
+The Fleetbase change is merged in appcraft-ltd/fleetbase-dwc PR #6 and deployed as
+`75286de76b8b119dda1cc3a0a2af7ffcec7b08cc`. It reuses existing Users, Drivers,
+VerificationCodes, mail transport and personal access tokens. Codes are stored
+hashed, expire in ten minutes, lock after three wrong guesses and are consumed
+atomically with token issuance. No profile/account creation or shared API key.
 
-Copy `.env.dwc.example` to `.env` and supply the approved public host values.
-The example supplies the approved public Fleetbase API/socket addresses.
-Firebase push is disabled until an actual Firebase client is provisioned; the
-example contains no fake production push credentials. Google Maps requires an
-Android-restricted Maps key before map acceptance. The in-app location-sharing
-notification does not require Firebase.
+Focused disposable MySQL/Redis proof passes hashing, expiry, replay, guess limits,
+owner/company drift, inactive/deleted/no-driver refusal and token ownership; mail
+is captured. Live health/send-to-synthetic-identity/invalid-code checks return
+200/202/422. No real driver emails, order writes, test accounts or deliveries were
+created for QA. Client tests cover the actual email form and tracking/permission
+guards. Android native compilation and signed release build pass. The signed app
+installs and opens its email screen on an Android 15 arm64 emulator. A real-driver
+email login and road/battery validation remain operator acceptance; they are not
+claimed as completed QA.
 
-## Email API contract awaiting the server implementation
+## GPS without Transistorsoft on Android
 
-`POST /v1/navigator/auth/email` accepts `{email}`. The server must select only an
-existing active driver in the configured organization, throttle IP and identity,
-and send a short-lived verification code through its existing email transport.
-Return the same `{status: "ok"}` for unavailable identities; no account creation.
+Android autolinking excludes both Transistorsoft packages. Their Android Gradle
+hooks and license metadata are removed. Our Kotlin module uses Google Play
+services Location and an Android location foreground service. An online driver
+with precise location permission sees a persistent sharing notification. Offline
+or logout stops the service and erases its in-memory token. It uses the existing
+driver-track endpoint, accepts HTTPS only and refuses redirects. It never starts
+at boot; after force-stop, device restart or process termination the driver must
+reopen the app. Disconnected devices resume with a current fix after moving; this
+version does not promise complete offline route history or Transistorsoft's
+motion/battery behavior. The existing iOS adapter retains its original dependency;
+this is an Android release only.
 
-`POST /v1/navigator/auth/verify` accepts `{email, code}`. Enforce organization,
-active-user/driver ownership, expiry, bounded guesses and atomic single-use
-consumption using the existing VerificationCode and personal access token models.
-Return `{driver: {...existingDriverResource, token}}` only after verification.
-There must be no test/bypass code, arbitrary company selector, new auth service,
-embedded shared API key, or automatic retry. These endpoints are **not present
-in the current deployed server**; they need an owned Fleetbase change and focused
-server tests before this client can be released. The client is not made ready
-merely by compiling it.
+## Build and configuration
 
-## Android location without Transistorsoft
+Use Node 22 and Yarn 3.6.4, JDK 17+, Android SDK 36 and the pinned NDK. Copy
+`.env.dwc.example` to `.env`. It supplies only the approved public addresses and
+app identity. Keep `INSTANCE_LOCKED=true` and `FLEETBASE_KEY` empty. No instance,
+mail, signing or company API secret belongs in that file or in the APK.
 
-Android autolinking excludes both Transistorsoft packages. Their Gradle hooks and
-license metadata are removed from the Android build. The Android adapter uses
-our Kotlin module and Google Play services Location, with a native `location`
-foreground service. The existing iOS adapter still uses its original dependency;
-this work makes no iOS release claim.
+Signing uses the four existing ANDROID_NAVIGATOR_APP_UPLOAD_* environment variables
+or gitignored android/local.properties. The private signing material is retained
+separately by the operator and must be preserved for subsequent APK updates.
 
-Only an authenticated online driver with granted precise location permission can
-start the service from the open application. Android displays a persistent
-notification. Offline/logout erases the native session and stops tracking. The
-native service posts to the existing driver track endpoint using that driver's
-token, refuses HTTP/redirects, and keeps coordinates and credentials in memory.
-It never starts at boot. Force-stop, device restart or process termination needs
-the driver to reopen the app. An offline device sends a new current fix after
-reconnecting; this version does not promise complete offline route history,
-Transistorsoft motion detection, or equal battery performance.
+The first build targets arm64-v8a, Android 7.0+ (SDK 24), application ID
+`com.fullsendcargo.navigator`. This first beta has no configured Firebase push or
+Google Maps client key. Email sign-in and native GPS do not require either; map
+rendering/push configuration and the full operational driver workflow are separate
+follow-ups. External navigation apps can still be launched by existing Navigator
+features. No Google Maps or push acceptance is claimed.
 
-## Verification and release boundary
-
-Focused client tests cover identity validation, token-only session acceptance,
-refusal/uncertain-request handling, and permission/online/logout tracking guards.
-Native compilation and actual Android foreground/background/offline/logout/
-permission-revocation testing are separate required checks. Publish a signed APK
-only after the actual server email flow and a phone smoke pass. Keep its signing
-key outside source and outside react-native-config; preserve it for updates.
-
-On 2026-11-06 the human explicitly authorized access to the existing Fleetbase
-Railway deployment and release of email sign-in support for this task. CargoDept
-remains on Render. The earlier automatic Railway denial was resolved by that
-explicit approval; it is not a current release blocker.
+The human authorized this task's existing Fleetbase Railway deployment on
+2026-11-06. CargoDept remains on Render and was not changed by this release.

@@ -45,9 +45,9 @@ export default function EmailLoginScreen() {
                     <Text color='white' fontSize='$9' fontWeight='bold'>FullSend Driver</Text>
                     <Text color='$gray-300' fontSize='$5'>{sentTo ? `If this email belongs to an active driver, a code was sent to ${sentTo}.` : 'Sign in with your driver email.'}</Text>
                     {sentTo ? (
-                        <Input accessibilityLabel='Verification code' value={code} onChangeText={setCode} keyboardType='number-pad' autoComplete='one-time-code' maxLength={6} placeholder='6-digit code' editable={!busy} color='white' bg='$gray-800' size='$5' onSubmitEditing={submit} />
+                        <Input accessibilityLabel='Verification code' value={code} onChangeText={setCode} keyboardType='number-pad' autoComplete='one-time-code' maxLength={6} placeholder='6-digit code' placeholderTextColor='#9ca3af' editable={!busy} color='white' bg='$gray-800' size='$5' onSubmitEditing={submit} />
                     ) : (
-                        <Input accessibilityLabel='Email address' value={email} onChangeText={setEmail} keyboardType='email-address' autoCapitalize='none' autoCorrect={false} autoComplete='email' placeholder='Your email' editable={!busy} color='white' bg='$gray-800' size='$5' onSubmitEditing={submit} />
+                        <Input accessibilityLabel='Email address' value={email} onChangeText={setEmail} keyboardType='email-address' autoCapitalize='none' autoCorrect={false} autoComplete='email' placeholder='Your email' placeholderTextColor='#9ca3af' editable={!busy} color='white' bg='$gray-800' size='$5' onSubmitEditing={submit} />
                     )}
                     {!!error && <Text accessibilityRole='alert' color='$red-300'>{error}</Text>}
                     <Button size='$5' bg='$primary' disabled={busy} onPress={submit}>
