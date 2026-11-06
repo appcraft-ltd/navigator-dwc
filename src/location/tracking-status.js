@@ -11,7 +11,7 @@ export function trackingStatus({ isOnline, isTracking, permissionStatus, trackin
             LOCATION_TIMEOUT: 'A current GPS location is unavailable. Check that Location is enabled on your phone.',
             LOCATION_UNAVAILABLE: 'A current GPS location is unavailable. Check that Location is enabled on your phone.',
         };
-        return { label: 'Tracking error', detail: messages[trackingError] || 'Location sharing could not start. Turn it off and on to try again.', color: '$red-500' };
+        return { label: 'Error', detail: messages[trackingError] || 'Location sharing could not start. Turn it off and on to try again.', color: '$red-500' };
     }
     return isTracking
         ? { label: 'On', detail: 'Location sharing is active.', color: '$green-500' }

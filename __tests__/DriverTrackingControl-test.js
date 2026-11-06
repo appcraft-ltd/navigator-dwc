@@ -54,6 +54,6 @@ test('permission, upload, session and start failures remain distinct from a succ
     expect(trackingStatus({ ...on, permissionStatus: 'denied' }).label).toBe('Permission needed');
     expect(trackingStatus({ ...on, trackingError: 'LOCATION_UPLOAD_UNAVAILABLE' }).detail).toContain('cannot reach dispatch');
     expect(trackingStatus({ ...on, trackingError: 'LOCATION_SESSION_EXPIRED' }).detail).toContain('Sign in again');
-    expect(trackingStatus({ ...on, isTracking: false, trackingError: 'LOCATION_START' }).label).toBe('Tracking error');
+    expect(trackingStatus({ ...on, isTracking: false, trackingError: 'LOCATION_START' }).label).toBe('Error');
     expect(trackingStatus({ ...on, isOnline: false, trackingError: 'LOCATION_UPLOAD_UNAVAILABLE' }).label).toBe('Off');
 });
