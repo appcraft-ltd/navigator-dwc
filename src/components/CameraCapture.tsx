@@ -4,7 +4,6 @@ import { YStack, XStack, Button, Text, Image, Card, ScrollView } from 'tamagui';
 import { Camera, useCameraDevice } from 'react-native-vision-camera';
 import type { Camera as CameraRef } from 'react-native-vision-camera';
 import { launchImageLibrary } from 'react-native-image-picker';
-import RNFS from 'react-native-fs';
 import useDimensions from '../hooks/use-dimensions';
 import { toast, ToastPosition } from '../utils/toast';
 
@@ -12,13 +11,16 @@ const MENU_BAR_HEIGHT = 160;
 
 interface CapturedPhoto {
     uri: string;
+    capturedAt?: string;
 }
 
 interface CameraCaptureScreenProps {
     onDone?: (photos: CapturedPhoto[]) => void;
+    maxPhotos?: number;
+    allowGallery?: boolean;
 }
 
-const CameraCapture = ({ onDone }: CameraCaptureScreenProps) => {
+const CameraCapture = ({ onDone, maxPhotos = 10, allowGallery = true }: CameraCaptureScreenProps) => {
     const cameraRef = useRef<CameraRef>(null);
     const device = useCameraDevice('back');
     const { screenHeight } = useDimensions();
@@ -40,7 +42,7 @@ const CameraCapture = ({ onDone }: CameraCaptureScreenProps) => {
     }, []);
 
     const handleTakePhoto = useCallback(async () => {
-        if (!cameraRef.current) return;
+        if (!cameraRef.current || photos.length >= maxPhotos) return;
         try {
             const photo = await cameraRef.current.takePhoto({
                 flash: 'off',
@@ -49,17 +51,16 @@ const CameraCapture = ({ onDone }: CameraCaptureScreenProps) => {
             toast.info('Photo captured.', { position: ToastPosition.TOP });
 
             const filePath = (Platform.OS === 'ios' ? '' : 'file://') + photo.path;
-            const base64Data = await RNFS.readFile(filePath, 'base64');
             const newCapturedPhoto = {
                 uri: filePath,
-                base64: base64Data,
+                capturedAt: new Date().toISOString(),
             };
 
             setPhotos((prev) => [...prev, newCapturedPhoto]);
         } catch (error) {
             console.warn('Error taking photo:', error);
         }
-    }, []);
+    }, [photos.length, maxPhotos]);
 
     // Use the system photo picker so the app only receives access to photos
     // explicitly selected by the user.
@@ -67,7 +68,7 @@ const CameraCapture = ({ onDone }: CameraCaptureScreenProps) => {
         try {
             const result = await launchImageLibrary({
                 mediaType: 'photo',
-                selectionLimit: 10,
+                selectionLimit: maxPhotos,
             });
 
             if (result.didCancel) return;
@@ -78,7 +79,7 @@ const CameraCapture = ({ onDone }: CameraCaptureScreenProps) => {
             const selectedPhotos = (result.assets ?? []).flatMap((asset) => (asset.uri ? [{ uri: asset.uri }] : []));
             if (selectedPhotos.length === 0) return;
 
-            setPhotos((prev) => [...prev, ...selectedPhotos]);
+            setPhotos((prev) => [...prev, ...selectedPhotos].slice(0, maxPhotos));
             toast.info(`${selectedPhotos.length} photo${selectedPhotos.length === 1 ? '' : 's'} added from gallery.`, { position: ToastPosition.TOP });
         } catch (error) {
             console.warn('Error selecting from camera roll:', error);
@@ -106,7 +107,7 @@ const CameraCapture = ({ onDone }: CameraCaptureScreenProps) => {
     if (!device || !hasPermission) {
         return (
             <YStack flex={1} justifyContent='center' alignItems='center'>
-                <Text color='$textSecondary'>Loading camera or awaiting permission...</Text>
+                <Text color='$textSecondary'>Camera access is required. Enable Camera permission in Android Settings, then reopen this step.</Text>
             </YStack>
         );
     }
@@ -118,10 +119,10 @@ const CameraCapture = ({ onDone }: CameraCaptureScreenProps) => {
             </YStack>
             <YStack width='100%' height={MENU_BAR_HEIGHT} bg='$background' py='$3' space='$4' borderTopWidth={1} borderColor='$borderColorWithShadow'>
                 <XStack ai='center' jc='space-between' px='$4'>
-                    <Button onPress={handleSelectFromCameraRoll}>
+                    {allowGallery && <Button onPress={handleSelectFromCameraRoll}>
                         <Button.Text>Gallery</Button.Text>
-                    </Button>
-                    <Button onPress={handleTakePhoto} size='$6' circular bg='$blue-500' borderWidth={5} borderColor='$blue-700'>
+                    </Button>}
+                    <Button onPress={handleTakePhoto} disabled={photos.length >= maxPhotos} size='$6' circular bg='$blue-500' borderWidth={5} borderColor='$blue-700'>
                         <Button.Text fontSize={14} color='$white'>
                             Snap
                         </Button.Text>
@@ -131,7 +132,7 @@ const CameraCapture = ({ onDone }: CameraCaptureScreenProps) => {
                     </Button>
                 </XStack>
                 <YStack px='$5'>
-                    <Button width='100%' bg='$success' borderWidth={1} borderColor='$successBorder' onPress={handleDone}>
+                    <Button width='100%' disabled={photos.length === 0} bg='$success' borderWidth={1} borderColor='$successBorder' onPress={handleDone}>
                         <Button.Text fontSize={15} color='$successText'>
                             Done
                         </Button.Text>

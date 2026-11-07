@@ -513,3 +513,19 @@ patchStaleCodegenPackageJsons();
 patchReactNativeNotificationsFcmToken();
 patchKotlinGradleNodeResolution(reactNativeReanimatedBuildGradle, 'react-native-reanimated');
 patchKotlinGradleNodeResolution(reactNativeWorkletsBuildGradle, 'react-native-worklets');
+
+// Android uses the legacy module interop here: the application's native
+// autolinking deliberately excludes this package's C++ codegen registration.
+// Advertising a TurboModule without that registration makes NativeModules
+// ImageResizer null on RN 0.86 and leaves photo preparation unable to run.
+function patchAndroidImageResizerInterop() {
+    const root = path.join(__dirname, '..', 'node_modules', '@bam.tech', 'react-native-image-resizer', 'android');
+    const packageFile = path.join(root, 'src/main/java/com/reactnativeimageresizer/ImageResizerPackage.java');
+    const original = fs.readFileSync(packageFile, 'utf8');
+    const patched = original.replace('boolean isTurboModule = BuildConfig.IS_NEW_ARCHITECTURE_ENABLED;', 'boolean isTurboModule = false; // Native legacy interop; no C++ provider');
+    if (patched === original && !original.includes('isTurboModule = false;')) throw new Error('ImageResizer package interop patch no longer applies');
+    if (patched !== original) fs.writeFileSync(packageFile, patched);
+    const bridge = fs.readFileSync(path.join(root, 'src/oldarch/com/reactnativeimageresizer/ImageResizerSpec.java'), 'utf8');
+    fs.writeFileSync(path.join(root, 'src/newarch/com/reactnativeimageresizer/ImageResizerSpec.java'), bridge);
+}
+patchAndroidImageResizerInterop();

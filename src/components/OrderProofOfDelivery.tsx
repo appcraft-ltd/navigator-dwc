@@ -18,7 +18,7 @@ const OrderProofOfDelivery = ({ order, subject }) => {
     const theme = useTheme();
     const insets = useSafeAreaInsets();
     const id = order.id ?? null;
-    const [proofs, setProofs] = useStorage(`${id}_proofs`, []);
+    const [proofs, setProofs] = useState([]);
     const [isLoading, setIsLoading] = useState(false);
     const [fullscreenImage, setFullscreenImage] = useState(null);
 
@@ -37,11 +37,11 @@ const OrderProofOfDelivery = ({ order, subject }) => {
         } finally {
             setIsLoading(false);
         }
-    }, [adapter]);
+    }, [adapter, id, subject?.id]);
 
     const openImage = (proof) => {
         let url = proof.url;
-        if (proof.remarks.endsWith('Signature')) {
+        if (proof.remarks?.endsWith('Signature')) {
             url = proof.raw;
         }
         setFullscreenImage(url);
@@ -56,7 +56,7 @@ const OrderProofOfDelivery = ({ order, subject }) => {
             <YStack px='$3' py='$2' width={PROOF_COLUMN_WIDTH}>
                 <YStack mb='$2'>
                     <Pressable onPress={() => openImage(proof)}>
-                        {proof.remarks.endsWith('Photo') && (
+                        {proof.remarks?.endsWith('Photo') && (
                             <FastImage
                                 source={{ uri: proof.url }}
                                 style={{
@@ -66,7 +66,7 @@ const OrderProofOfDelivery = ({ order, subject }) => {
                                 }}
                             />
                         )}
-                        {proof.remarks.endsWith('Signature') && (
+                        {proof.remarks?.endsWith('Signature') && (
                             <FastImage
                                 source={{ uri: proof.raw }}
                                 style={{
@@ -76,7 +76,7 @@ const OrderProofOfDelivery = ({ order, subject }) => {
                                 }}
                             />
                         )}
-                        {proof.remarks.endsWith('Scan') && (
+                        {proof.remarks?.endsWith('Scan') && (
                             <YStack alignItems='center' justifyContent='center'>
                                 <FontAwesomeIcon icon={faQrcode} color={theme['$blue-400'].val} size={40} />
                             </YStack>

@@ -37,6 +37,7 @@ import OrderCustomerCard from '../components/OrderCustomerCard';
 import OrderProgressBar from '../components/OrderProgressBar';
 import OrderCommentThread from '../components/OrderCommentThread';
 import OrderProofOfDelivery from '../components/OrderProofOfDelivery';
+import DeliveryOrderActions from '../components/DeliveryOrderActions';
 import CurrentDestinationSelect from '../components/CurrentDestinationSelect';
 import OrderActivitySelect from '../components/OrderActivitySelect';
 import LoadingOverlay from '../components/LoadingOverlay';
@@ -79,6 +80,7 @@ const OrderScreen = ({ route }) => {
     const [loadingOverlayMessage, setLoadingOverlayMessage] = useState();
     const [currentDestination, setCurrentDestination] = useState();
     const [isAccepting, setIsAccepting] = useState(false);
+    const [deliveryManaged, setDeliveryManaged] = useState(true);
     const memoizedOrder = useMemo(() => order, [order?.id]);
     const { trackerData } = useOrderResource(memoizedOrder, { loadEta: false });
     const distanceLoadedRef = useRef(false);
@@ -467,9 +469,8 @@ const OrderScreen = ({ route }) => {
             }
         };
 
-        if (store.proof) {
+        if (store.proof && store.proof.order === order.id && !deliveryManaged) {
             // Storage has new proof
-            console.log('Temp store is containing recent proof!', store.proof);
             const { activity, proof } = store.proof;
             updateActivityWithProof(activity, proof);
         }
@@ -530,6 +531,7 @@ const OrderScreen = ({ route }) => {
                     />
                 </YStack>
                 <ActionContainer space='$3'>
+                    <DeliveryOrderActions key={order.id} order={order} onOrder={updateOrder} onManaged={setDeliveryManaged} />
                     {isOldAndroid && showLoadingOverlay && (
                         <YStack>
                             <XStack alignItems='center' gap='$2' borderWidth={1} borderColor='$infoBorder' bg='$info' py='$2' px='$3' borderRadius='$5'>
@@ -541,7 +543,7 @@ const OrderScreen = ({ route }) => {
                         </YStack>
                     )}
                     <XStack space='$2' ml={-5}>
-                        {isIncomingAdhoc && (
+                        {!deliveryManaged && isIncomingAdhoc && (
                             <XStack flex={1} space='$2' ml={5}>
                                 <Button onPress={handleAdhocAccept} flex={1} bg='$success' borderWidth={1} borderColor='$successBorder' disabled={isAccepting}>
                                     <Button.Icon>{isAccepting ? <SafeSpinner color={theme.successText.val} /> : <FontAwesomeIcon icon={faCheck} color={theme.successText.val} />}</Button.Icon>
@@ -555,7 +557,7 @@ const OrderScreen = ({ route }) => {
                                 </Button>
                             </XStack>
                         )}
-                        {isNotStarted && (
+                        {!deliveryManaged && isNotStarted && (
                             <Button onPress={() => startOrder()} bg='$success' borderWidth={1} borderColor='$successBorder'>
                                 <Button.Icon>
                                     {isLoading('startOrder') ? <SafeSpinner color={theme.successText.val} /> : <FontAwesomeIcon icon={faFlagCheckered} color={theme.successText.val} />}
@@ -563,7 +565,7 @@ const OrderScreen = ({ route }) => {
                                 <Button.Text color='$successText'>Start Order</Button.Text>
                             </Button>
                         )}
-                        {order.isInProgress && (
+                        {!deliveryManaged && order.isInProgress && (
                             <Button onPress={() => updateOrderActivity()} bg='$success' borderWidth={1} borderColor='$successBorder'>
                                 <Button.Icon>
                                     {isLoading('nextOrderActivity') ? <SafeSpinner color={theme.successText.val} /> : <FontAwesomeIcon icon={faPenToSquare} color={theme.infoText.val} />}

@@ -2,6 +2,7 @@ import React, { createContext, useContext, useReducer, useMemo, useEffect, useCa
 import { Platform } from 'react-native';
 import { EventRegister } from 'react-native-event-listeners';
 import { Driver } from '@fleetbase/sdk';
+import { clearPendingDelivery } from '../utils/delivery-confirmations';
 import { later, isArray, navigatorConfig } from '../utils';
 import useStorage, { storage } from '../hooks/use-storage';
 import useFleetbase from '../hooks/use-fleetbase';
@@ -250,6 +251,7 @@ export const AuthProvider = ({ children }) => {
 
     // Remove local session data
     const clearSessionData = () => {
+        clearPendingDelivery();
         storage.removeItem('_driver_token');
         storage.removeItem('organizations');
         storage.removeItem('driver');

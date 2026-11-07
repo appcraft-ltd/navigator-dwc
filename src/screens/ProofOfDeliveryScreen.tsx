@@ -5,6 +5,8 @@ import { Order, Place } from '@fleetbase/sdk';
 import { titleize } from 'inflected';
 import { SectionHeader, SectionInfoLine } from '../components/Content';
 import { isNone, resizePhoto } from '../utils';
+import { sendMultipart } from '../utils/delivery-confirmations';
+import RNFS from 'react-native-fs';
 import { toast } from '../utils/toast';
 import { useTempStore } from '../contexts/TempStoreContext';
 import useDimensions from '../hooks/use-dimensions';
@@ -81,40 +83,32 @@ const ProofOfDeliveryScreen = ({ route }) => {
 
     const handlePhotosCaptured = useCallback(
         async (photos = []) => {
+            if (!photos.length || isLoading) return;
             setIsLoading(true);
-
-            // Resize all photos first in parallel
-            const resizedPhotos = await Promise.all(
-                photos.map(async (p) => {
-                    const smallUri = await resizePhoto(p.uri);
-                    // const smallBase64 = await RNFS.readFile(smallUri, 'base64');
-                    // return { uri: smallUri, base64: smallBase64 };
-
-                    return { uri: smallUri };
-                })
-            );
-
-            const form = new FormData();
-            resizedPhotos.forEach((p, i) => {
-                form.append(`photos[${i}]`, {
-                    uri: p.uri,
-                    name: `photo-${i}.jpg`,
-                    type: 'image/jpeg',
-                });
-            });
-
+            const resizedPhotos = [];
             try {
-                const proof = await adapter.post(`orders/${order.id}/capture-photo`, form, { headers: { 'Content-Type': 'multipart/form-data' } });
+                setLoadingOverlayMessage('Preparing photos…');
+                // Bound peak memory and send real file parts, never JSON/base64.
+                for (const photo of photos.slice(0, 10)) {
+                    const uri = await resizePhoto(photo.uri);
+                    if (!uri) throw new Error('Unable to prepare photo. Please take another photo.');
+                    resizedPhotos.push({ uri, original: photo.uri });
+                }
+                const form = new FormData();
+                resizedPhotos.forEach((photo, i) => form.append(`photos[${i}]`, { uri: photo.uri, name: `photo-${i}.jpg`, type: 'image/jpeg' }));
+                const suffix = subject?.id && subject.id !== order.id ? `/${subject.id}` : '';
+                const proof = await sendMultipart(adapter, `orders/${order.id}/capture-photo${suffix}`, form, (percent) =>
+                    setLoadingOverlayMessage(percent === 100 ? 'Saving photos…' : percent === null ? 'Uploading photos…' : `Uploading photos: ${percent}%`));
                 setValue('proof', { proof, activity, order: order.id, waypoint: waypoint?.id, entity: entity?.id });
                 navigation.goBack();
             } catch (err) {
                 toast.error(err.message ?? 'Unable to upload captured photos.');
-                console.warn('Error capturing photos as proof:', err);
             } finally {
+                for (const photo of resizedPhotos) if (photo.uri !== photo.original) await RNFS.unlink(photo.uri.replace('file://', '')).catch(() => {});
                 setIsLoading(false);
             }
         },
-        [adapter, navigation]
+        [adapter, navigation, order.id, subject?.id, isLoading]
     );
 
     if (method === 'scan') {
