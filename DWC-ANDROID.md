@@ -91,10 +91,12 @@ The APK embeds `certs/updates.pem` (public certificate). The corresponding **pri
 To deliver a compatible OTA from clean committed source:
 
 1. Read the target APK's exact runtime from its safe release receipt.
-2. `node scripts/updates/export-ota.cjs /absolute/new-export-dir APK_RUNTIME`
+2. `node scripts/updates/export-ota.cjs /absolute/new-export-dir /absolute/target-apk-receipt.safe.json`
 3. `node scripts/updates/prepare-ota.cjs /absolute/new-export-dir /absolute/new-assets-dir UNIQUE_RELEASE_TAG APK_RUNTIME /private/path/private-key.pem`
 4. Publish every prepared `interface-*.hbc` and `asset-*` file under that exact GitHub Release tag. Verify their public byte hashes before activation.
 5. Preserve all other runtime entries and update only the matching runtime in `codex/android-update-channel:updates/ota-channel.json` with the prepared `ota-entry.json` value. The API caches channel reads for 60 seconds.
 6. Verify the signed update on the target release build. To roll back a bad release, publish a fresh signed update with the previous known-good source/assets, a new UUID and a later creation time. Do not edit assets or reuse an update UUID. Expo's built-in failed-launch recovery remains enabled; never bypass signatures or disable anti-bricking measures.
+
+The export also compares `package.json` and `app.config.js` byte-for-byte with the target APK receipt's exact `sourceSha`, covering autolinking/Expo configuration changes that can leave the dependency lockfile unchanged. Preparation repeats this baseline check. Never substitute a JavaScript-only release SHA for the original APK source in that receipt.
 
 For native updates, publish a higher versionCode signed with the existing APK key, verify the anonymous asset, then update `android-apk.json`. Keep older OTA runtime entries until those binaries are retired. A new APK is required once to add this mechanism to 0.1.1; older installations cannot receive OTA retroactively.
