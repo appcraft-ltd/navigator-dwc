@@ -2,7 +2,7 @@ const { runtimeVersion } = require('./scripts/updates/runtime.cjs');
 module.exports = {
     name: 'FullSend Driver', slug: 'fullsend-driver', version: '0.1.2',
     runtimeVersion: runtimeVersion(), platforms: ['android'],
-    android: { package: 'com.fullsendcargo.navigator', versionCode: 3 },
+    android: { package: 'com.fullsendcargo.navigator', versionCode: 4 },
     updates: {
         url: 'https://fleetbase-dwc-production.up.railway.app/v1/navigator/updates/manifest',
         checkAutomatically: 'NEVER', fallbackToCacheTimeout: 0,

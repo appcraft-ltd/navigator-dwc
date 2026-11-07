@@ -419,6 +419,13 @@ function patchReactNativeNotificationsFcmToken() {
     let fcmToken = fs.readFileSync(reactNativeNotificationsFcmToken, 'utf8');
     const original = fcmToken;
 
+    // The APK beta intentionally has no Firebase project. Native app-ready
+    // callbacks may run even while JS push registration is disabled.
+    fcmToken = fcmToken.replace(
+        '    protected void refreshToken() {\n        FirebaseMessaging.getInstance().getToken()',
+        '    protected void refreshToken() {\n        if (com.google.firebase.FirebaseApp.getApps(mAppContext).isEmpty()) return;\n        FirebaseMessaging.getInstance().getToken()'
+    );
+
     fcmToken = fcmToken.replace(
         `    protected void sendTokenToJS() {
         final ReactInstanceManager instanceManager = ((ReactApplication) mAppContext).getReactNativeHost().getReactInstanceManager();
