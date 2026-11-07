@@ -1,19 +1,19 @@
 import React, { useState, useRef, useMemo } from 'react';
-import { StyleSheet } from 'react-native';
+import { StyleSheet, Platform } from 'react-native';
 import { Text, YStack, XStack, useTheme } from 'tamagui';
 import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
 import { faBuilding, faTruck } from '@fortawesome/free-solid-svg-icons';
 import { Driver, Place } from '@fleetbase/sdk';
 import { useLocation } from '../contexts/LocationContext';
-import { restoreFleetbasePlace, getCoordinates } from '../utils/location';
+import { restoreFleetbasePlace } from '../utils/location';
 import { config, last, first } from '../utils';
 import { formattedAddressFromPlace } from '../utils/location';
-import { toast } from '../utils/toast';
 import MapView, { Marker } from 'react-native-maps';
 import MapViewDirections from 'react-native-maps-directions';
 import LocationMarker from './LocationMarker';
 import DriverMarker from './DriverMarker';
 import useFleetbase from '../hooks/use-fleetbase';
+import { placeCoordinate } from '../utils/known-coordinates';
 
 // Utility functions
 const calculateDeltas = (zoom) => {
@@ -34,8 +34,7 @@ const calculateOffset = (zoomLevel) => {
 };
 
 const getPlaceCoords = (place) => {
-    const [latitude, longitude] = getCoordinates(place);
-    return { latitude, longitude };
+    return placeCoordinate(place);
 };
 
 // Reusable marker label component
@@ -85,7 +84,7 @@ const LiveOrderRoute = ({
         const locations = [pickup, ...waypoints, dropoff].filter(Boolean);
         const destination = locations.find((place) => place?.id === currentWaypoint) ?? locations[0];
 
-        return new Place(destination);
+        return destination ? new Place(destination) : null;
     }, [pickup, dropoff, waypoints, order]);
 
     // Determine the start waypoint
@@ -101,39 +100,34 @@ const LiveOrderRoute = ({
     const destination = getPlaceCoords(end);
 
     // Get only the "middle" waypoints (excluding the first and last ones)
-    const middleWaypoints = focusCurrentDestination ? [] : waypoints.slice(1, -1).map((waypoint) => ({ coordinate: getPlaceCoords(waypoint), ...waypoint }));
+    const middleWaypoints = focusCurrentDestination ? [] : waypoints.slice(1, -1).map((waypoint) => ({ ...waypoint, coordinate: getPlaceCoords(waypoint) })).filter((waypoint) => waypoint.coordinate);
 
     // Adjust marker size if a bunch of middle waypoints
-    markerSize = middleWaypoints.length > 0 ? (middleWaypoints > 3 ? 'xxs' : 'xs') : markerSize;
+    markerSize = middleWaypoints.length > 0 ? (middleWaypoints.length > 3 ? 'xxs' : 'xs') : markerSize;
 
     // Initial map props
     const initialDeltas = calculateDeltas(zoom);
-    const [mapRegion, setMapRegion] = useState({
-        ...origin,
-        latitudeDelta: initialDeltas,
-        longitudeDelta: initialDeltas,
-    });
     const [zoomLevel, setZoomLevel] = useState(calculateZoomLevel(initialDeltas));
     const markerOffset = calculateOffset(zoomLevel);
     const driverAssigned = order.getAttribute('driver_assigned') ? new Driver(order.getAttribute('driver_assigned')) : null;
 
     const handleRegionChangeComplete = (region) => {
-        setMapRegion(region);
         const newZoomLevel = calculateZoomLevel(region.latitudeDelta);
         setZoomLevel(newZoomLevel);
     };
 
     const fitToRoute = ({ coordinates }) => {
-        mapRef.current.fitToCoordinates(coordinates, {
+        mapRef.current?.fitToCoordinates(coordinates, {
             edgePadding: { top: edgePaddingTop, right: edgePaddingRight, bottom: edgePaddingBottom, left: edgePaddingLeft },
             animated: true,
         });
     };
 
     const focusDriver = ({ coordinates }) => {
+        if (!coordinates) return;
         // Note: latitude and longitude should be derived from coordinates
         const { latitude, longitude } = coordinates;
-        mapRef.current.animateToRegion(
+        mapRef.current?.animateToRegion(
             {
                 latitude,
                 longitude,
@@ -144,17 +138,25 @@ const LiveOrderRoute = ({
         );
     };
 
+    const mapsConfigured = Platform.OS !== 'android' || Boolean(String(config('GOOGLE_MAPS_API_KEY') || '').trim());
+    if (!mapsConfigured || !origin || !destination) {
+        return <YStack width={width} height={height} bg='$surface' justifyContent='center' alignItems='center' padding='$3' {...props}>
+            <Text color='$textSecondary' textAlign='center'>{!mapsConfigured ? 'Map preview unavailable' : focusCurrentDestination && !origin ? 'Waiting for your location…' : 'Route coordinates unavailable'}</Text>
+            {children}
+        </YStack>;
+    }
+
     return (
         <YStack flex={1} position='relative' overflow='hidden' width={width} height={height} {...props}>
             <MapView
                 ref={mapRef}
                 style={{ ...StyleSheet.absoluteFillObject, width: '100%', height: '100%' }}
-                initialRegion={mapRegion}
+                initialRegion={{ ...origin, latitudeDelta: initialDeltas, longitudeDelta: initialDeltas }}
                 onRegionChangeComplete={handleRegionChangeComplete}
                 scrollEnabled={scrollEnabled}
                 {...mapViewProps}
             >
-                {driverAssigned && <DriverMarker driver={driverAssigned} onMovement={focusDriver} />}
+                {driverAssigned && placeCoordinate(driverAssigned) && <DriverMarker driver={driverAssigned} onMovement={focusDriver} />}
                 {start && start?.id !== 'driver' && (
                     <Marker coordinate={origin} centerOffset={markerOffset}>
                         <MarkerLabel icon={start?.id === 'driver' ? faTruck : null} label={formattedAddressFromPlace(start)} markerOffset={markerOffset} theme={theme} />

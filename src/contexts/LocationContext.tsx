@@ -7,6 +7,7 @@ import { isEmpty } from '../utils';
 import { useAuth } from './AuthContext';
 import useStorage from '../hooks/use-storage';
 import useFleetbase from '../hooks/use-fleetbase';
+import { locationCoordinate } from '../utils/known-coordinates';
 
 const LocationContext = createContext({
     location: null,
@@ -84,14 +85,15 @@ export const LocationProvider = ({ children }) => {
     // Get the drivers location as a Place
     const getDriverLocationAsPlace = useCallback(
         (attributes = {}) => {
-            const { coords } = location;
+            const coordinate = locationCoordinate(location);
+            if (!coordinate) return null;
 
             return new Place(
                 {
                     id: 'driver',
                     name: 'Driver Location',
                     street1: 'Driver Location',
-                    location: new Point(coords.latitude, coords.longitude),
+                    location: new Point(coordinate.latitude, coordinate.longitude),
                     ...attributes,
                 },
                 adapter

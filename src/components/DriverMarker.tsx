@@ -1,18 +1,19 @@
-import React, { useRef, useEffect, useCallback } from 'react';
+import React, { useRef, useCallback } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
 import TrackingMarker from './TrackingMarker';
 import useSocketClusterClient from '../hooks/use-socket-cluster-client';
 import useEventBuffer from '../hooks/use-event-buffer';
+import { placeCoordinate } from '../utils/known-coordinates';
 
 const DriverMarker = ({ driver, onPositionChange, onHeadingChange, onMovement, ...props }) => {
     const markerRef = useRef();
     const listenerRef = useRef();
     const handleEvent = useCallback((data) => {
-        console.log('Incoming data:', data);
-        const movementData = { data };
+        const movementData: any = { data };
+        const coordinate = placeCoordinate(data);
 
-        if (data.location && data.location.coordinates) {
-            const [latitude, longitude] = data.location.coordinates;
+        if (coordinate) {
+            const { latitude, longitude } = coordinate;
             if (markerRef.current) {
                 markerRef.current.move(latitude, longitude);
             }
@@ -21,25 +22,25 @@ const DriverMarker = ({ driver, onPositionChange, onHeadingChange, onMovement, .
                 onPositionChange({ latitude, longitude });
             }
 
-            movementData = { ...movementData, coordinates: { latitude, longitude } };
+            movementData.coordinates = coordinate;
         }
 
-        if (typeof data.heading === 'number') {
+        if (Number.isFinite(data?.heading)) {
             if (markerRef.current) {
                 markerRef.current.rotate(data.heading);
             }
 
-            if (typeof onPositionChange === 'function') {
+            if (typeof onHeadingChange === 'function') {
                 onHeadingChange(data.heading);
             }
 
-            movementData = { ...movementData, heading: data.heading };
+            movementData.heading = data.heading;
         }
 
         if (typeof onMovement === 'function') {
             onMovement(movementData);
         }
-    }, []);
+    }, [onPositionChange, onHeadingChange, onMovement]);
     const { listen } = useSocketClusterClient();
     const { addEvent, clearEvents } = useEventBuffer(handleEvent);
 
@@ -63,10 +64,12 @@ const DriverMarker = ({ driver, onPositionChange, onHeadingChange, onMovement, .
         }, [listen, driver.id])
     );
 
+    const coordinate = placeCoordinate(driver);
+    if (!coordinate) return null;
     return (
         <TrackingMarker
             ref={markerRef}
-            coordinate={{ latitude: driver.latitude, longitude: driver.longitude }}
+            coordinate={coordinate}
             imageSource={{ uri: driver.getAttribute('vehicle_avatar') }}
             size={{ width: 50, height: 50 }}
             {...props}

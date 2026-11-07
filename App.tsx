@@ -18,6 +18,7 @@ import { LocationProvider } from './src/contexts/LocationContext';
 import { ConfigProvider } from './src/contexts/ConfigContext';
 import config from './tamagui.config';
 import { AppUpdatesProvider } from './src/updates/AppUpdates';
+import AppRecoveryBoundary from './src/components/AppRecoveryBoundary';
 
 function AppContent(): React.JSX.Element {
     const { appTheme } = useThemeContext();
@@ -37,7 +38,7 @@ function AppContent(): React.JSX.Element {
                                                     <TempStoreProvider>
                                                         <ChatProvider>
                                                             <OrderManagerProvider>
-                                                                <AppUpdatesProvider><AppNavigator /></AppUpdatesProvider>
+                                                                <AppUpdatesProvider><AppRecoveryBoundary><AppNavigator /></AppRecoveryBoundary></AppUpdatesProvider>
                                                                 <Toasts extraInsets={{ bottom: 80 }} />
                                                                 <PortalHost name='MainPortal' />
                                                                 <PortalHost name='BottomSheetPanelPortal' />
