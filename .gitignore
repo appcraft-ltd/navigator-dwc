@@ -102,3 +102,4 @@ vendor
 *.pxd
 
 !.env.dwc.example
+.expo/

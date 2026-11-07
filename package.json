@@ -55,6 +55,8 @@
         "countries-list": "^3.0.6",
         "country-locale-map": "^1.9.0",
         "date-fns": "^4.1.0",
+        "expo": "57.0.0",
+        "expo-updates": "57.0.0",
         "inflected": "^2.1.0",
         "language-name-map": "^0.3.0",
         "locale-emoji": "^0.3.0",
@@ -127,6 +129,7 @@
         "babel-loader": "^9.2.1",
         "babel-plugin-preval": "^5.1.0",
         "babel-plugin-react-native-web": "^0.19.13",
+        "babel-preset-expo": "~57.0.1",
         "css-loader": "^7.1.2",
         "dotenv": "^16.4.7",
         "eslint": "^8.19.0",
@@ -162,5 +165,16 @@
             "<rootDir>/legacy/"
         ]
     },
-    "packageManager": "yarn@3.6.4"
+    "packageManager": "yarn@3.6.4",
+    "main": "index.js",
+    "expo": {
+        "autolinking": {
+            "android": {
+                "exclude": [
+                    "expo-keep-awake",
+                    "expo-font"
+                ]
+            }
+        }
+    }
 }

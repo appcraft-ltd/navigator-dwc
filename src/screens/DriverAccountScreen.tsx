@@ -13,6 +13,7 @@ import { useLanguage } from '../contexts/LanguageContext';
 import useAppTheme from '../hooks/use-app-theme';
 import DeviceInfo from 'react-native-device-info';
 import storage from '../utils/storage';
+import { AppUpdatesCard } from '../updates/AppUpdates';
 
 const DriverAccountScreen = () => {
     const theme = useTheme();
@@ -329,6 +330,7 @@ const DriverAccountScreen = () => {
                             showsHorizontalScrollIndicator={false}
                         />
                     </YStack>
+                    <AppUpdatesCard />
                     <YStack padding='$4' mb='$5'>
                         <Button marginTop='$4' bg='$error' borderWidth={1} borderColor='$errorBorder' size='$5' onPress={handleSignout} rounded width='100%'>
                             <Button.Icon>{isSigningOut ? <Spinner color={theme['$errorText'].val} /> : <YStack />}</Button.Icon>

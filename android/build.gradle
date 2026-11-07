@@ -10,7 +10,7 @@ buildscript {
         compileSdkVersion = 36
         targetSdkVersion = 36
         ndkVersion = "27.1.12297006"
-        kotlinVersion = "2.0.21"
+        kotlinVersion = "2.1.20"
         appCompatVersion = "1.4.2"
         REACT_NATIVE_NODE_MODULES_DIR = file("$rootDir/../node_modules/react-native").absolutePath
     }
@@ -25,7 +25,6 @@ buildscript {
     dependencies {
         classpath("com.android.tools.build:gradle:3.5.4")
         classpath("com.facebook.react:react-native-gradle-plugin")
-        classpath("org.jetbrains.kotlin:kotlin-gradle-plugin:1.9.0")
         classpath('com.google.gms:google-services:4.3.15')
         classpath("org.jetbrains.kotlin:kotlin-gradle-plugin")
     }

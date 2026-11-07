@@ -1,0 +1,13 @@
+const fs = require('node:fs');
+const path = require('node:path');
+const { execFileSync } = require('node:child_process');
+const { runtimeVersion } = require('./runtime.cjs');
+const root = path.resolve(__dirname, '../..');
+const [destination, expectedRuntime] = process.argv.slice(2);
+if (!destination || runtimeVersion() !== expectedRuntime) throw new Error('Provide the exact runtime from the target APK receipt. Native changes require an APK.');
+if (execFileSync('git', ['status', '--porcelain'], { cwd: root }).length) throw new Error('Commit reviewed source before exporting an OTA.');
+if (fs.existsSync(destination)) throw new Error('Export directory must be new.');
+const sha = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim();
+execFileSync(process.execPath, [require.resolve('expo/bin/cli'), 'export', '--platform', 'android', '--output-dir', destination], { cwd: root, stdio: 'inherit' });
+if (runtimeVersion() !== expectedRuntime || execFileSync('git', ['status', '--porcelain'], { cwd: root }).length) throw new Error('Source changed during export.');
+fs.writeFileSync(path.join(destination, 'export-runtime.json'), JSON.stringify({ runtimeVersion: expectedRuntime, sourceSha: sha }) + '\n');

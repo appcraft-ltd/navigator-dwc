@@ -25,6 +25,8 @@ ext.REACT_NATIVE_NODE_MODULES_DIR = file("$rootDir/../node_modules/react-native"
  * By default you don't need to apply any configuration, just uncomment the lines you need.
  */
 react {
+    cliFile = file("../../node_modules/@expo/cli/build/bin/cli")
+    bundleCommand = "export:embed"
     /* Folders */
     //   The root of your project, i.e. where "package.json" lives. Default is '../..'
     // root = file("../../")
@@ -97,6 +99,12 @@ android {
     
     namespace "io.fleetbase.navigator"
     defaultConfig {
+        def runtimeOutput = new ByteArrayOutputStream()
+        exec {
+            commandLine resolveNodeExecutable(), file('../../scripts/updates/runtime.cjs').absolutePath
+            standardOutput = runtimeOutput
+        }
+        resValue "string", "expo_runtime_version", runtimeOutput.toString().trim()
         applicationId project.env.get("APP_IDENTIFIER")
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion

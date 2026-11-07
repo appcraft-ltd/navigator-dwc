@@ -78,3 +78,23 @@ features. No Google Maps or push acceptance is claimed.
 
 The human authorized this task's existing Fleetbase Railway deployment on
 2026-11-06. CargoDept remains on Render and was not changed by this release.
+# Android 0.1.2 — APK and signed OTA updates
+
+Account contains **App updates**. On launch/foreground (at most every six hours) both public channels are checked independently. Compatible interface updates download automatically on unmetered connections; manual download also works on mobile data. Downloads never reload the running app. A downloaded interface update launches on the next cold start, or the driver can explicitly choose Apply interface update while Offline. Android APK installation also requires Offline and Android's normal user confirmation. Login/storage are preserved by a same-package, same-signature update.
+
+APK metadata: public `codex/android-update-channel:updates/android-apk.json`. APKs must be hosted by this fork's GitHub Releases, match declared size/SHA-256/package/version and the installed signing certificate. Only a private cache subdirectory is shared read-only with Android's installer. Drivers may need to allow FullSend Driver as an installation source once, then return and tap Install update. Cancelling the installer leaves the downloaded update available.
+
+OTA uses Expo Updates 57 and the existing Fleetbase public GET `/v1/navigator/updates/manifest`. The endpoint relays exact signed manifest bytes from `updates/ota-channel.json`; it reads no drivers, orders or sessions. It distinguishes known empty runtimes (protocol 204) from read/parse failures (503). Assets are immutable GitHub Release files. No EAS account, paid service, shared driver API key, new schema or native permission bypass is used.
+
+The APK embeds `certs/updates.pem` (public certificate). The corresponding **private** OTA key is stored outside the repository at the existing local Fleetbase signing location; never add it to `.env`, app resources, Git or releases. Native runtime IDs hash native sources/resources/build settings, dependency lockfile, native package patches and public build configuration. Rebuild the APK whenever that conservative hash changes. Never override the hash to push incompatible JavaScript.
+
+To deliver a compatible OTA from clean committed source:
+
+1. Read the target APK's exact runtime from its safe release receipt.
+2. `node scripts/updates/export-ota.cjs /absolute/new-export-dir APK_RUNTIME`
+3. `node scripts/updates/prepare-ota.cjs /absolute/new-export-dir /absolute/new-assets-dir UNIQUE_RELEASE_TAG APK_RUNTIME /private/path/private-key.pem`
+4. Publish every prepared `interface-*.hbc` and `asset-*` file under that exact GitHub Release tag. Verify their public byte hashes before activation.
+5. Preserve all other runtime entries and update only the matching runtime in `codex/android-update-channel:updates/ota-channel.json` with the prepared `ota-entry.json` value. The API caches channel reads for 60 seconds.
+6. Verify the signed update on the target release build. To roll back a bad release, publish a fresh signed update with the previous known-good source/assets, a new UUID and a later creation time. Do not edit assets or reuse an update UUID. Expo's built-in failed-launch recovery remains enabled; never bypass signatures or disable anti-bricking measures.
+
+For native updates, publish a higher versionCode signed with the existing APK key, verify the anonymous asset, then update `android-apk.json`. Keep older OTA runtime entries until those binaries are retired. A new APK is required once to add this mechanism to 0.1.1; older installations cannot receive OTA retroactively.
