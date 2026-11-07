@@ -10,7 +10,7 @@ jest.mock('../src/location/BackgroundLocation', () => ({ getCurrentPosition: (..
 jest.mock('../src/hooks/use-storage', () => ({ storage: {
     getMap: key => mockValues.get(key), setMap: (key, value) => mockValues.set(key, value), removeItem: key => mockValues.delete(key), getAllKeys: () => [...mockValues.keys()],
 } }));
-const { prepareDeliveryPhoto, clearPendingDelivery, pendingKey, confirmationForm, sendMultipart } = require('../src/utils/delivery-confirmations');
+const { prepareDeliveryPhoto, clearPendingDelivery, pendingKey, confirmationForm, sendMultipart, multipartHeaders } = require('../src/utils/delivery-confirmations');
 let request;
 class MockXHR {
     constructor() { request = this; this.headers = {}; this.upload = {}; }
@@ -66,6 +66,19 @@ test('multipart uses native binary body/boundary, reports actual upload progress
 });
 test('network timeout is an unknown result and retains exact pending evidence', async () => {
     const key = pendingKey('driver_one','order_one'); mockValues.set(key,{operationId:'fixed',path:'/private-app/delivery-confirmations/fixed.jpg'});
-    const pending = sendMultipart({host:'https://example.test',headers:{}},'step',new FormData()); request.ontimeout();
+    const pending = sendMultipart({host:'https://example.test',headers:{Authorization:'Bearer synthetic'}},'step',new FormData()); request.ontimeout();
     await expect(pending).rejects.toThrow('Retry'); expect(mockValues.get(key).operationId).toBe('fixed');
+});
+test('Axios SDK credentials are included even when adapter.headers is empty', async () => {
+    const adapter = { host:'https://example.test', headers:{}, axiosInstance:{defaults:{headers:{Authorization:'Bearer initial',common:{authorization:'Bearer current'},'Content-Type':'application/json'}}} };
+    const pending = sendMultipart(adapter, 'step', new FormData());
+    expect(request.headers.authorization).toBe('Bearer current');
+    expect(request.headers.common).toBeUndefined(); expect(request.headers['content-type']).toBeUndefined();
+    request.status=200;request.responseText='{}';request.onload();await expect(pending).resolves.toEqual({});
+});
+test('missing credentials fail before any photo bytes are sent', async () => {
+    request = null;
+    await expect(sendMultipart({host:'https://example.test',headers:{}},'step',new FormData())).rejects.toThrow('Sign in again');
+    expect(request).toBeNull();
+    expect(multipartHeaders({headers:{Authorization:'Bearer browser'}}).get('authorization')).toBe('Bearer browser');
 });

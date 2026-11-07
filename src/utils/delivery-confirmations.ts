@@ -7,17 +7,29 @@ export const DELIVERY_PENDING_PREFIX = 'delivery-confirmation:';
 const directory = `${RNFS.DocumentDirectoryPath}/delivery-confirmations`;
 export const pendingKey = (driverId: string, orderId: string) => `${DELIVERY_PENDING_PREFIX}${driverId}:${orderId}`;
 
+export function multipartHeaders(adapter) {
+    // RN selects the SDK's Axios adapter, whose credentials live in defaults,
+    // whereas the browser adapter keeps them directly in headers.
+    const headers = new Map<string, string>();
+    for (const source of [adapter.axiosInstance?.defaults?.headers, adapter.axiosInstance?.defaults?.headers?.common, adapter.headers]) {
+        for (const [name, value] of Object.entries(source || {})) {
+            if (typeof value === 'string' && !['content-type', 'content-length', 'user-agent'].includes(name.toLowerCase())) headers.set(name.toLowerCase(), value);
+        }
+    }
+    if (!headers.get('authorization')?.trim()) throw new Error('Sign in again before uploading your photo. Your photo is saved.');
+    headers.set('accept', 'application/json');
+    return headers;
+}
+
 export function sendMultipart(adapter, path: string, form: FormData, onProgress = (_value: number | null) => {}) {
     return new Promise<any>((resolve, reject) => {
+        const headers = multipartHeaders(adapter);
         const xhr = new XMLHttpRequest();
         xhr.open('POST', `${adapter.host.replace(/\/$/, '')}/${adapter.namespace || 'v1'}/${path}`);
         xhr.timeout = 60000;
         // Native networking supplies the multipart boundary. The SDK's JSON
         // adapter must never serialize FormData or set Content-Type here.
-        for (const [name, value] of Object.entries(adapter.headers || {})) {
-            if (!['content-type', 'content-length', 'user-agent'].includes(name.toLowerCase())) xhr.setRequestHeader(name, String(value));
-        }
-        xhr.setRequestHeader('Accept', 'application/json');
+        for (const [name, value] of headers) xhr.setRequestHeader(name, value);
         xhr.upload.onprogress = (event) => onProgress(event.lengthComputable ? Math.round(100 * event.loaded / event.total) : null);
         xhr.onload = () => {
             let result;

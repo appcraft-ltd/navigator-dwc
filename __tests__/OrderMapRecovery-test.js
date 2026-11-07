@@ -1,0 +1,61 @@
+import React from 'react';
+import Renderer, {act} from 'react-test-renderer';
+import {Text, View, Pressable} from 'react-native';
+import {locationCoordinate, placeCoordinate} from '../src/utils/known-coordinates';
+let mockGps = null, mockMapsKey = '';
+const mockLogout = jest.fn();
+jest.mock('tamagui', () => ({Text:require('react-native').Text,YStack:require('react-native').View,XStack:require('react-native').View,useTheme:()=>({'$blue-500':{val:'#3388ff'},'$gray-200':{val:'#eeeeee'}})}));
+jest.mock('@fortawesome/react-native-fontawesome',()=>({FontAwesomeIcon:()=>null}));
+jest.mock('@fleetbase/sdk',()=>({Place:class {constructor(data){this.data=data;}getAttribute(key){return this.data?.[key];}},Driver:class{}}));
+jest.mock('../src/contexts/LocationContext',()=>({useLocation:()=>({getDriverLocationAsPlace:()=>mockGps})}));
+jest.mock('../src/contexts/AuthContext',()=>({useAuth:()=>({driver:{id:'synthetic'},logout:mockLogout})}));
+jest.mock('../src/hooks/use-fleetbase',()=>()=>({adapter:{}}));
+jest.mock('../src/utils',()=>({config:()=>mockMapsKey,first:a=>a[0],last:a=>a[a.length-1]}));
+jest.mock('../src/utils/location',()=>({restoreFleetbasePlace:x=>x,formattedAddressFromPlace:()=>''}));
+jest.mock('react-native-maps',()=>({__esModule:true,default:require('react-native').View,Marker:()=>null}));
+jest.mock('react-native-maps-directions',()=>()=>null);
+jest.mock('../src/components/LocationMarker',()=>()=>null);
+jest.mock('../src/components/DriverMarker',()=>()=>null);
+const LiveOrderRoute=require('../src/components/LiveOrderRoute').default;
+const AppRecoveryBoundary=require('../src/components/AppRecoveryBoundary').default;
+const place=(x,y)=>({id:'synthetic',location:{type:'Point',coordinates:[x,y]}});
+const payload={pickup:place(55.2,25.1),dropoff:place(55.3,25.2),waypoints:[],current_waypoint:'synthetic'};
+const order={getAttribute:path=>path.startsWith('payload.')?payload[path.slice(8)]:null};
+const text=screen=>screen.root.findAllByType(Text).map(n=>n.props.children).join(' ');
+let screen;
+beforeEach(()=>{mockGps=null;mockMapsKey='';mockLogout.mockClear();Object.defineProperty(require('react-native').Platform,'OS',{configurable:true,value:'android'});});
+afterEach(async()=>{if(screen)await act(async()=>screen.unmount());screen=null;});
+test('unknown GPS stays unknown, valid zero and GeoJSON longitude-first are preserved',()=>{
+    for(const v of [null,{}, {coords:{}},{coords:{latitude:NaN,longitude:55}},{coords:{latitude:25,longitude:181}}])expect(locationCoordinate(v)).toBeNull();
+    expect(locationCoordinate({coords:{latitude:0,longitude:0}})).toEqual({latitude:0,longitude:0});
+    expect(placeCoordinate(place(55.2,25.1))).toEqual({latitude:25.1,longitude:55.2});
+    expect(placeCoordinate({})).toBeNull();
+});
+test('active order before first GPS shows a placeholder, then mounts a valid map when GPS arrives',async()=>{
+    mockMapsKey='synthetic';
+    await act(async()=>{screen=Renderer.create(<LiveOrderRoute order={order} focusCurrentDestination/>)});
+    expect(text(screen)).toContain('Waiting for your location');
+    expect(screen.root.findAll(n=>n.props.initialRegion)).toHaveLength(0);
+    mockGps=place(55.4,25.3);
+    await act(async()=>screen.update(<LiveOrderRoute order={order} focusCurrentDestination/>));
+    expect(screen.root.findAll(n=>n.props.initialRegion)[0].props.initialRegion).toMatchObject({latitude:25.3,longitude:55.4});
+});
+test('unconfigured Android maps remain a usable placeholder even with valid addresses',async()=>{
+    await act(async()=>{screen=Renderer.create(<LiveOrderRoute order={order}/>)});
+    expect(text(screen)).toContain('Map preview unavailable');
+    expect(screen.root.findAll(n=>n.props.initialRegion)).toHaveLength(0);
+});
+test('render failure shows recovery; retry preserves session and sign out is explicit',async()=>{
+    let fail=true;
+    function Broken(){if(fail)throw Error('synthetic');return <Text>Orders recovered</Text>}
+    const log=jest.spyOn(console,'error').mockImplementation(()=>{});
+    await act(async()=>{screen=Renderer.create(<AppRecoveryBoundary><Broken/></AppRecoveryBoundary>)});
+    expect(text(screen)).toContain('Unable to open this screen');expect(mockLogout).not.toHaveBeenCalled();
+    fail=false;
+    await act(async()=>screen.root.findAll(n=>n.props.accessibilityRole==='button' && n.props.onPress)[0].props.onPress());
+    expect(text(screen)).toContain('Orders recovered');expect(mockLogout).not.toHaveBeenCalled();
+    fail=true;
+    await act(async()=>screen.update(<AppRecoveryBoundary><Broken key='again'/></AppRecoveryBoundary>));
+    await act(async()=>screen.root.findAll(n=>n.props.accessibilityRole==='button' && n.props.onPress).slice(-1)[0].props.onPress());
+    expect(mockLogout).toHaveBeenCalledTimes(1);log.mockRestore();
+});

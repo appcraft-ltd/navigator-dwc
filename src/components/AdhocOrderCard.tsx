@@ -11,6 +11,7 @@ import { useLocation } from '../contexts/LocationContext';
 import { useAuth } from '../contexts/AuthContext';
 import useAppTheme from '../hooks/use-app-theme';
 import useFleetbase from '../hooks/use-fleetbase';
+import { locationCoordinate, placeCoordinate } from '../utils/known-coordinates';
 import OrderProgressBar from './OrderProgressBar';
 import LiveOrderRoute from './LiveOrderRoute';
 import OrderWaypointList, { WaypointItem } from './OrderWaypointList';
@@ -40,7 +41,9 @@ export const AdhocOrderCard = ({ order, onPress, onAccept, onDismiss }) => {
     }, [order]);
 
     const distance = useMemo(() => {
-        return getDistance([location.coords.latitude, location.coords.longitude], destination);
+        const origin = locationCoordinate(location);
+        if (!origin || !placeCoordinate(destination)) return null;
+        return getDistance([origin.latitude, origin.longitude], destination);
     }, [location, destination]);
 
     const handleAccept = useCallback(async () => {
@@ -110,7 +113,7 @@ export const AdhocOrderCard = ({ order, onPress, onAccept, onDismiss }) => {
                 <YStack flex={1} borderRadius='$4'>
                     <XStack bg='$blue-800' alignItems='center' px='$3' py='$3' mb='$3' borderBottomWidth={1} borderColor='$infoBorder'>
                         <Text color='$infoText' fontSize='$6' fontWeight='bold'>
-                            Order Available Nearby: {formatMeters(distance)}
+                            Order Available Nearby{distance === null ? '' : `: ${formatMeters(distance)}`}
                         </Text>
                     </XStack>
                     <XStack alignItems='start' justifyContent='space-between' px='$3' mb='$3'>
@@ -126,7 +129,7 @@ export const AdhocOrderCard = ({ order, onPress, onAccept, onDismiss }) => {
                                     {formatWhatsAppTimestamp(new Date(order.getAttribute('created_at')))}
                                 </Text>
                                 <Text color='$textPrimary' fontSize={13}>
-                                    {formatMeters(distance)} away
+                                    {distance === null ? 'Waiting for your location' : `${formatMeters(distance)} away`}
                                 </Text>
                             </YStack>
                         </XStack>
