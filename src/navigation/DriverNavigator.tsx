@@ -94,7 +94,7 @@ function createTabScreens() {
 
                 return {
                     tabBarLabel: isAndroid ? 'Runs' : config('DRIVER_ORDER_TAB_LABEL', 'Orders'),
-                    tabBarBadge: allActiveOrders.length,
+                    tabBarBadge: isAndroid ? undefined : allActiveOrders.length,
                     tabBarBadgeStyle: {
                         marginRight: -5,
                         opacity: allActiveOrders.length ? 1 : 0.5,
