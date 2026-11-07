@@ -17,7 +17,7 @@ import com.facebook.react.soloader.OpenSourceMergedSoMapping
 import com.facebook.soloader.SoLoader
 
 class MainApplication : Application(), ReactApplication {
-  private fun packages(): List<ReactPackage> = PackageList(this).packages.apply { add(DwcLocationPackage()); add(DwcUpdatesPackage()) }
+  private fun packages(): List<ReactPackage> = PackageList(reactNativeHost).packages.apply { add(DwcLocationPackage()); add(DwcUpdatesPackage()) }
 
   override val reactNativeHost: ReactNativeHost =
           object : DefaultReactNativeHost(this) {
