@@ -330,7 +330,7 @@ const DriverAccountScreen = () => {
                             showsHorizontalScrollIndicator={false}
                         />
                     </YStack>
-                    <AppUpdatesCard />
+                    {Platform.OS !== 'android' && <AppUpdatesCard />}
                     <YStack padding='$4' mb='$5'>
                         <Button marginTop='$4' bg='$error' borderWidth={1} borderColor='$errorBorder' size='$5' onPress={handleSignout} rounded width='100%'>
                             <Button.Icon>{isSigningOut ? <Spinner color={theme['$errorText'].val} /> : <YStack />}</Button.Icon>

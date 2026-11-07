@@ -7,6 +7,7 @@ import { later } from '../utils';
 import { useNotification } from '../contexts/NotificationContext';
 import { useChat } from '../contexts/ChatContext';
 import { useOrderManager } from '../contexts/OrderManagerContext';
+import { AppUpdatesNotice } from '../updates/AppUpdates';
 import useFleetbase from '../hooks/use-fleetbase';
 
 const getCurrentScreen = (tabNavigation) => {
@@ -110,7 +111,7 @@ const DriverLayout = ({ children, state, descriptors, navigation: tabNavigation 
         };
     }, [addNotificationListener, removeNotificationListener, fleetbase, tabNavigation, navigation]);
 
-    return <View style={{ width: '100%', height: '100%', flex: 1, backgroundColor: theme.background.val, paddingTop: Platform.OS === 'android' ? insets.top : 0 }}>{children}</View>;
+    return <View style={{ width: '100%', height: '100%', flex: 1, backgroundColor: theme.background.val, paddingTop: Platform.OS === 'android' ? insets.top : 0 }}>{Platform.OS === 'android' && state.routes[state.index]?.name !== 'DriverAccountTab' && <AppUpdatesNotice onOpen={() => tabNavigation.navigate('DriverAccountTab', { screen: 'DriverProfile' })} />}{children}</View>;
 };
 
 export default DriverLayout;

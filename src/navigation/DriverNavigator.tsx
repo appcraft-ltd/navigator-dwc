@@ -27,7 +27,7 @@ import { useTempStore } from '../contexts/TempStoreContext';
 import DriverDashboardScreen from '../screens/DriverDashboardScreen';
 import DriverOrderManagementScreen from '../screens/DriverOrderManagementScreen';
 import DeliveryRunsScreen from '../screens/DeliveryRunsScreen';
-import DeliveryRunScreen from '../screens/DeliveryRunScreen';
+import DeliveryRunScreen, { CurrentRunScreen } from '../screens/DeliveryRunScreen';
 import OrderScreen from '../screens/OrderScreen';
 import EntityScreen from '../screens/EntityScreen';
 import ProofOfDeliveryScreen from '../screens/ProofOfDeliveryScreen';
@@ -84,7 +84,7 @@ function createTabScreens() {
         DriverDashboardTab: {
             screen: DriverDashboardTab,
             options: {
-                tabBarLabel: config('DRIVER_DASHBOARD_TAB_LABEL', 'Dash'),
+                tabBarLabel: isAndroid ? 'Current Run' : config('DRIVER_DASHBOARD_TAB_LABEL', 'Dash'),
             },
         },
         DriverTaskTab: {
@@ -156,7 +156,7 @@ function getDefaultTabIcon(routeName) {
     let icon;
     switch (routeName) {
         case 'DriverDashboardTab':
-            icon = faGaugeHigh;
+            icon = isAndroid ? faFlag : faGaugeHigh;
             break;
         case 'DriverTaskTab':
             icon = faClipboardList;
@@ -197,33 +197,8 @@ function getDriverNavigatorHeaderOptions({ route, navigation }) {
     };
 }
 
-const DriverDashboardTab = createNativeStackNavigator({
-    initialRouteName: 'DriverDashboard',
-    screens: {
-        DriverDashboard: {
-            screen: DriverDashboardScreen,
-            options: ({ route, navigation }) => {
-                return {
-                    headerShown: false,
-                };
-            },
-        },
-    },
-});
-
-const DriverTaskTab = createNativeStackNavigator({
-    initialRouteName: 'DriverOrderManagement',
-    screens: {
-        StandaloneOrders: { screen: DriverOrderManagementScreen, options: { title: 'Standalone orders' } },
-        DeliveryRun: { screen: DeliveryRunScreen, options: { headerShown: false } },
-        DriverOrderManagement: {
-            screen: isAndroid ? DeliveryRunsScreen : DriverOrderManagementScreen,
-            options: ({ route, navigation }) => {
-                return {
-                    headerShown: false,
-                };
-            },
-        },
+// Shared order screens keep package/proof navigation inside either run tab.
+const DriverOrderScreens = {
         Order: {
             screen: OrderScreen,
             options: ({ route, navigation }) => {
@@ -288,6 +263,37 @@ const DriverTaskTab = createNativeStackNavigator({
                 };
             },
         },
+};
+
+const DriverDashboardTab = createNativeStackNavigator({
+    initialRouteName: 'DriverDashboard',
+    screens: {
+        ...DriverOrderScreens,
+        DriverDashboard: {
+            screen: isAndroid ? CurrentRunScreen : DriverDashboardScreen,
+            options: ({ route, navigation }) => {
+                return {
+                    headerShown: false,
+                };
+            },
+        },
+    },
+});
+
+const DriverTaskTab = createNativeStackNavigator({
+    initialRouteName: 'DriverOrderManagement',
+    screens: {
+        StandaloneOrders: { screen: DriverOrderManagementScreen, options: { title: 'Standalone orders' } },
+        DeliveryRun: { screen: DeliveryRunScreen, options: { headerShown: false } },
+        DriverOrderManagement: {
+            screen: isAndroid ? DeliveryRunsScreen : DriverOrderManagementScreen,
+            options: ({ route, navigation }) => {
+                return {
+                    headerShown: false,
+                };
+            },
+        },
+        ...DriverOrderScreens,
     },
 });
 

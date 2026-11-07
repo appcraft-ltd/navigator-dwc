@@ -1,10 +1,11 @@
 import React from 'react';
 import Renderer, {act} from 'react-test-renderer';
-import {Text} from 'react-native';
+import {Text,AppState} from 'react-native';
+let mockMissingCurrent = false;
 let mockRun, mockLost, mockFailBeforeCommit, mockDriver='driver_one';
 const mockValues=new Map();
 const mockNavigate=jest.fn(),mockBack=jest.fn();
-const mockAdapter={get:jest.fn(async()=>JSON.parse(JSON.stringify(mockRun))),post:jest.fn(async(path,data)=>{
+const mockAdapter={get:jest.fn(async(path)=>path.includes('view=current') ? (mockMissingCurrent ? {} : {run:mockRun?.accepted ? JSON.parse(JSON.stringify(mockRun)) : null}) : JSON.parse(JSON.stringify(mockRun))),post:jest.fn(async(path,data)=>{
  if(mockFailBeforeCommit) throw Error('Offline');
  mockRun={...mockRun,accepted:true,status:'in_progress',acceptance_operation_id:data.operation_id};
  if(mockLost)throw Error('Lost acknowledgement');return mockRun;
@@ -21,9 +22,9 @@ const {runMapHtml,runDistance,runAcceptKey}=require('../src/utils/delivery-runs'
 const labels=screen=>screen.root.findAllByType(Text).map(n=>n.props.children).flat().join(' ');
 const button=(screen,label)=>screen.root.findAll(n=>typeof n.type==='function'&&n.props.onPress&&n.findAllByType(Text).map(x=>x.props.children).flat().join(' ')===label)[0];
 let screen;
-beforeEach(()=>{jest.clearAllMocks();mockValues.clear();mockLost=false;mockFailBeforeCommit=false;mockDriver='driver_one';mockRun={id:'manifest_one',date:'2026-11-07',status:'active',distance_m:12400,stop_count:4,accepted:false,orders:[{id:'order_second',status:'dispatched',meta:{cargodept_order_number:'DO-42'}},{id:'order_first',status:'dispatched',meta:{cargodept_order_number:'DO-41'}}],stops:[{sequence:1,order_id:'order_second',type:'pickup',name:'Warehouse',lat:25,lng:55},{sequence:2,order_id:'order_second',type:'dropoff',name:'Customer 42',lat:25.2,lng:55.3},{sequence:3,order_id:'order_first',type:'pickup',name:'Warehouse',lat:25,lng:55},{sequence:4,order_id:'order_first',type:'dropoff',name:'Customer 41',lat:25.1,lng:55.2}]}});
+beforeEach(()=>{AppState.currentState='active';jest.clearAllMocks();mockValues.clear();mockLost=false;mockFailBeforeCommit=false;mockMissingCurrent=false;mockDriver='driver_one';mockRun={id:'manifest_one',date:'2026-11-07',status:'active',distance_m:12400,stop_count:4,accepted:false,orders:[{id:'order_second',status:'dispatched',meta:{cargodept_order_number:'DO-42'}},{id:'order_first',status:'dispatched',meta:{cargodept_order_number:'DO-41'}}],stops:[{sequence:1,order_id:'order_second',type:'pickup',name:'Warehouse',lat:25,lng:55},{sequence:2,order_id:'order_second',type:'dropoff',name:'Customer 42',lat:25.2,lng:55.3},{sequence:3,order_id:'order_first',type:'pickup',name:'Warehouse',lat:25,lng:55},{sequence:4,order_id:'order_first',type:'dropoff',name:'Customer 41',lat:25.1,lng:55.2}]}});
 afterEach(async()=>{if(screen)await act(async()=>screen.unmount());screen=null});
-const mount=async()=>{await act(async()=>{screen=Renderer.create(<Screen route={{params:{runId:'manifest_one'}}}/>)});};
+const mount=async(current=false)=>{await act(async()=>{screen=Renderer.create(<Screen current={current} route={{params:{runId:'manifest_one'}}}/>)});};
 const press=async label=>{await act(async()=>button(screen,label).props.onPress());};
 test('whole run preview retains dispatcher sequence, estimated km and all stops before one accept',async()=>{
  await mount();const text=labels(screen);expect(text).toContain('~12.4 km');expect(text).toContain('4');expect(text.indexOf('DO-42')).toBeLessThan(text.indexOf('DO-41'));expect(mockAdapter.post).not.toHaveBeenCalled();
@@ -39,4 +40,16 @@ test('unaccepted offline attempt retains exact operation across retry',async()=>
 });
 test('route HTML never interpolates address HTML, auth or invalid coordinates',()=>{
  const html=runMapHtml([{lat:25,lng:55,name:'</script><script>bad()</script>'},{lat:null,lng:null},{lat:999,lng:55}]);expect(html).toContain('const p=[[25,55]]');expect(html).not.toContain('bad()');expect(html).not.toContain('navigator.geolocation');expect(runDistance({distance_m:null})).toBe('Distance unavailable');
+});
+
+test('Current Run opens accepted tasks directly and has no second acceptance',async()=>{
+ mockRun.accepted=true;mockRun.status='in_progress';await mount(true);
+ expect(labels(screen)).toContain('Current Run');expect(labels(screen)).toContain('Continue order · photo + GPS');expect(labels(screen)).not.toContain('Accept delivery run');
+ expect(mockAdapter.get).toHaveBeenCalledWith('navigator/runs?view=current');
+});
+test('known empty Current Run links to Runs without fabricating a current assignment',async()=>{
+ await mount(true);expect(labels(screen)).toContain('No current run');await press('Open Runs');expect(mockNavigate).toHaveBeenCalledWith('DriverTaskTab',{screen:'DriverOrderManagement'});
+});
+test('an unknown current-run response stays an error, not an empty assignment',async()=>{
+ mockMissingCurrent=true;await mount(true);expect(labels(screen)).toContain('Cannot refresh');expect(labels(screen)).not.toContain('No current run');
 });

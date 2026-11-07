@@ -79,3 +79,21 @@ test('APK download is explicit and installation stays blocked while tracking', a
     await act(async () => button(screen, 'Install update').props.onPress());
     expect(mockNative.install).toHaveBeenCalledTimes(1);
 });
+test('automatic APK discovery offers a dismissible notice without downloading, installing or interrupting work',async()=>{
+    const {AppUpdatesNotice}=require('../src/updates/AppUpdates.android');
+    const open=jest.fn();mockNative.check.mockResolvedValue({versionCode:8,versionName:'0.1.6'});
+    await act(async()=>{screen=Renderer.create(<AppUpdatesProvider><AppUpdatesNotice onOpen={open}/><AppUpdatesCard/></AppUpdatesProvider>)});
+    expect(text(screen)).toContain('Android 0.1.6 available');expect(mockNative.download).not.toHaveBeenCalled();expect(Alert.alert).not.toHaveBeenCalled();
+    await act(async()=>button(screen,'View').props.onPress());expect(open).toHaveBeenCalledTimes(1);
+    expect(text(screen)).not.toContain('Android 0.1.6 available');expect(button(screen,'Download Android 0.1.6')).toBeDefined();
+    expect(mockNative.install).not.toHaveBeenCalled();expect(Updates.reloadAsync).not.toHaveBeenCalled();
+});
+test('foreground checks remain limited to once per six hours',async()=>{
+    const {AppState}=require('react-native');let listener;const remove=jest.fn();const spy=jest.spyOn(AppState,'addEventListener').mockImplementation((event,cb)=>{listener=cb;return {remove}});
+    const now=jest.spyOn(Date,'now');let time=100000000;now.mockImplementation(()=>time);
+    try {
+        await mount();expect(mockNative.check).toHaveBeenCalledTimes(1);
+        await act(async()=>{listener('background');listener('active')});expect(mockNative.check).toHaveBeenCalledTimes(1);
+        time+=6*60*60*1000+1;await act(async()=>listener('active'));expect(mockNative.check).toHaveBeenCalledTimes(2);
+    } finally {spy.mockRestore();now.mockRestore();}
+});

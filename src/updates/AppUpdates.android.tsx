@@ -12,6 +12,7 @@ const CHECK_INTERVAL = 6 * 60 * 60 * 1000;
 
 export function AppUpdatesProvider({ children }) {
     const [state, setState] = useState<any>({ busy: null, checked: false, apk: null, apkReady: false, otaReady: false });
+    const [dismissedNotice, setDismissedNotice] = useState('');
     const busy = useRef(false);
     const lastCheck = useRef(0);
     const pending = Updates.useUpdates().isUpdatePending;
@@ -19,6 +20,7 @@ export function AppUpdatesProvider({ children }) {
     const check = useCallback(async (automatic = false) => {
         if (busy.current || !native) return;
         busy.current = true;
+        if (!automatic) setDismissedNotice('');
         lastCheck.current = Date.now();
         setState(previous => ({ ...previous, busy: 'checking' }));
         try {
@@ -89,7 +91,20 @@ export function AppUpdatesProvider({ children }) {
             setState(previous => ({ ...previous, apkReady: false }));
         } finally { busy.current = false; }
     };
-    return <Context.Provider value={{ ...state, otaReady: state.otaReady || pending, check, downloadApk, downloadOta, install }}>{children}</Context.Provider>;
+    const noticeKey = state.apk ? `apk-${state.apk.versionCode}` : (state.otaReady || pending) ? 'interface-ready' : '';
+    return <Context.Provider value={{ ...state, otaReady: state.otaReady || pending, check, downloadApk, downloadOta, install,
+        showNotice: !!noticeKey && noticeKey !== dismissedNotice, dismissNotice: () => setDismissedNotice(noticeKey) }}>{children}</Context.Provider>;
+}
+
+/** A dismissible in-app offer, never a modal, push notification or forced restart. */
+export function AppUpdatesNotice({ onOpen }) {
+    const updates = useContext(Context);
+    if (!updates?.showNotice) return null;
+    return <XStack testID='app-update-notice' px='$3' py='$2' gap='$2' alignItems='center' bg='$info' borderBottomWidth={1} borderColor='$infoBorder'>
+        <YStack flex={1}><Text color='$infoText' fontWeight='700'>{updates.apk ? `Android ${updates.apk.versionName} available` : 'Interface update ready'}</Text><Text color='$infoText' fontSize='$2'>Update when you are ready.</Text></YStack>
+        <Button size='$2' onPress={() => { updates.dismissNotice(); onOpen(); }}>View</Button>
+        <Button size='$2' onPress={updates.dismissNotice}>Later</Button>
+    </XStack>;
 }
 
 export function AppUpdatesCard() {
@@ -99,7 +114,7 @@ export function AppUpdatesCard() {
     if (!updates) return null;
     const applyInterface = () => {
         if (isOnline || isTracking) {
-            Alert.alert('Go offline first', 'Switch to Offline in Dash before restarting to apply the update.');
+            Alert.alert('Go offline first', 'Switch to Offline in Account before restarting to apply the update.');
             return;
         }
         Alert.alert('Apply interface update?', 'The app will restart. Your login will be kept.', [
@@ -109,7 +124,7 @@ export function AppUpdatesCard() {
     };
     const installAndroid = () => {
         if (isOnline || isTracking) {
-            Alert.alert('Go offline first', 'Switch to Offline in Dash before installing the Android update.');
+            Alert.alert('Go offline first', 'Switch to Offline in Account before installing the Android update.');
             return;
         }
         updates.install();

@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useCallback } from 'react';
 import { useNavigation } from '@react-navigation/native';
-import { SafeAreaView, FlatList, Pressable } from 'react-native';
+import { SafeAreaView, FlatList, Pressable, ScrollView, Platform } from 'react-native';
 import { Avatar, Text, YStack, XStack, Separator, useTheme } from 'tamagui';
 import { toast, ToastPosition } from '@backpackapp-io/react-native-toast';
 import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
@@ -9,6 +9,8 @@ import { abbreviateName, navigatorConfig, showActionSheet } from '../utils';
 import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import storage from '../utils/storage';
+import DriverOperationalStatus from '../components/DriverOperationalStatus';
+import { AppUpdatesCard } from '../updates/AppUpdates';
 
 const DriverProfileScreen = () => {
     const theme = useTheme();
@@ -96,7 +98,8 @@ const DriverProfileScreen = () => {
 
     return (
         <SafeAreaView style={{ flex: 1, backgroundColor: theme.background.val }}>
-            <YStack flex={1} bg='$background' space='$3' padding='$5'>
+            <ScrollView showsVerticalScrollIndicator={false}><YStack bg='$background' space='$3' padding='$3'>
+                {Platform.OS === 'android' && <Text color='$textPrimary' fontSize='$8' fontWeight='700' px='$3' pt='$3'>Account</Text>}
                 <XStack py='$3' space='$3' alignItems='flex-start' justifyContent='space-between'>
                     <YStack>
                         <Pressable onPress={handleViewProfile}>
@@ -130,7 +133,8 @@ const DriverProfileScreen = () => {
                         showsHorizontalScrollIndicator={false}
                     />
                 </YStack>
-            </YStack>
+                {Platform.OS === 'android' && <><AppUpdatesCard /><DriverOperationalStatus /></>}
+            </YStack></ScrollView>
         </SafeAreaView>
     );
 };
