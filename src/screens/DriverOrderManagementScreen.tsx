@@ -48,8 +48,8 @@ const DriverOrderManagementScreen = () => {
     const { isDarkMode } = useAppTheme();
     const { driver } = useAuth();
     const {
-        allActiveOrders,
-        currentOrders,
+        allActiveOrders: unfilteredActiveOrders,
+        currentOrders: unfilteredCurrentOrders,
         setCurrentDate,
         currentDate,
         reloadCurrentOrders,
@@ -62,6 +62,8 @@ const DriverOrderManagementScreen = () => {
         dismissedOrders,
         setDimissedOrders,
     } = useOrderManager();
+    const allActiveOrders = unfilteredActiveOrders.filter(order => !order.getAttribute('meta')?.navigator_run_id);
+    const currentOrders = unfilteredCurrentOrders.filter(order => !order.getAttribute('meta')?.navigator_run_id);
     const { listen } = useSocketClusterClient();
     const { addNotificationListener, removeNotificationListener } = useNotification();
     const startingDate = subDays(new Date(currentDate), 2);

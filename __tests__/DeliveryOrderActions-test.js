@@ -58,3 +58,11 @@ test('photo/GPS preparation failure cannot expose a send button or advance the s
  utils.prepareDeliveryPhoto.mockRejectedValueOnce(Error('GPS unavailable'));await mount();await press('Accept order');await press('Confirm pickup');await photo();
  expect(label(screen)).toContain('GPS unavailable');expect(label(screen)).toContain('Confirm pickup');expect(utils.sendMultipart).not.toHaveBeenCalled();
 });
+test('a run member cannot expose individual acceptance before the run is accepted',async()=>{
+ mockState={...mockState,next:null,run:{id:'manifest_one',accepted:false,blocked_reason:'Open and accept the whole delivery run first.'}};
+ await mount();expect(label(screen)).toContain('accept the whole delivery run');expect(label(screen)).not.toContain('Accept order');expect(mockAdapter.post).not.toHaveBeenCalled();
+});
+test('accepted run members start directly at photo/GPS pickup',async()=>{
+ mockState={...mockState,next:'pickup',step_key:'pickup',run:{id:'manifest_one',accepted:true},receipts:{accept:{run_id:'manifest_one'}}};
+ await mount();expect(label(screen)).toContain('Confirm pickup');expect(label(screen)).not.toContain('Accept order');await press('Confirm pickup');await photo();await press('Send pickup confirmation');expect(mockAdapter.post).not.toHaveBeenCalled();expect(utils.sendMultipart).toHaveBeenCalledTimes(1);
+});

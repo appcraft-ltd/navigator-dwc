@@ -26,6 +26,8 @@ import { useIsNotAuthenticated, useIsAuthenticated } from '../contexts/AuthConte
 import { useTempStore } from '../contexts/TempStoreContext';
 import DriverDashboardScreen from '../screens/DriverDashboardScreen';
 import DriverOrderManagementScreen from '../screens/DriverOrderManagementScreen';
+import DeliveryRunsScreen from '../screens/DeliveryRunsScreen';
+import DeliveryRunScreen from '../screens/DeliveryRunScreen';
 import OrderScreen from '../screens/OrderScreen';
 import EntityScreen from '../screens/EntityScreen';
 import ProofOfDeliveryScreen from '../screens/ProofOfDeliveryScreen';
@@ -91,7 +93,7 @@ function createTabScreens() {
                 const { allActiveOrders } = useOrderManager();
 
                 return {
-                    tabBarLabel: config('DRIVER_ORDER_TAB_LABEL', 'Orders'),
+                    tabBarLabel: isAndroid ? 'Runs' : config('DRIVER_ORDER_TAB_LABEL', 'Orders'),
                     tabBarBadge: allActiveOrders.length,
                     tabBarBadgeStyle: {
                         marginRight: -5,
@@ -212,8 +214,10 @@ const DriverDashboardTab = createNativeStackNavigator({
 const DriverTaskTab = createNativeStackNavigator({
     initialRouteName: 'DriverOrderManagement',
     screens: {
+        StandaloneOrders: { screen: DriverOrderManagementScreen, options: { title: 'Standalone orders' } },
+        DeliveryRun: { screen: DeliveryRunScreen, options: { headerShown: false } },
         DriverOrderManagement: {
-            screen: DriverOrderManagementScreen,
+            screen: isAndroid ? DeliveryRunsScreen : DriverOrderManagementScreen,
             options: ({ route, navigation }) => {
                 return {
                     headerShown: false,

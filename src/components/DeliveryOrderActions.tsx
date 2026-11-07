@@ -62,7 +62,7 @@ export default function DeliveryOrderActions({ order, onOrder, onManaged }) {
             // operation's photo or GPS, and never advance optimistically.
             const next = await refresh();
             const saved = storage.getMap(key) as any;
-            if (next.terminal || (pending && !saved)) return;
+            if (next.terminal || next.run?.blocked_reason || (pending && !saved)) return;
             if (next.next === 'accept') {
                 const acceptKey = `${key}:accept`;
                 let operationId = storage.getString(acceptKey);
@@ -92,7 +92,8 @@ export default function DeliveryOrderActions({ order, onOrder, onManaged }) {
     const title = state?.next === 'accept' ? 'Accept order' : state?.next === 'pickup' ? 'Confirm pickup' : 'Confirm drop off';
     return <YStack gap='$3' width='100%' py='$2'>
         <Text color='$textPrimary' fontSize='$5' fontWeight='700'>Delivery confirmation</Text>
-        <Text color='$textSecondary'>1. Accept → 2. Pickup photo + GPS → 3. Drop off photo + GPS</Text>
+        <Text color='$textSecondary'>{state?.run ? 'Pickup photo + GPS → Drop off photo + GPS' : '1. Accept → 2. Pickup photo + GPS → 3. Drop off photo + GPS'}</Text>
+        {!!state?.run?.blocked_reason && <Text color='$textSecondary'>{state.run.blocked_reason}</Text>}
         {state?.stop && <Text color='$textPrimary'>Stop {state.stop.sequence}: {state.stop.name || state.stop.address || state.stop.id}</Text>}
         {!state && <Button disabled={!!busy} onPress={() => refresh().catch(() => setError('Unable to check order. Please retry.'))}>Refresh delivery steps</Button>}
         {state?.terminal && <Text color='$textSecondary'>{state.order.status === 'completed' ? 'Delivery completed' : 'Order canceled'}</Text>}
