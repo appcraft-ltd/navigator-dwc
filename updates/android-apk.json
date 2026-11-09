@@ -1,8 +1,8 @@
 {
   "package": "com.fullsendcargo.navigator",
-  "versionCode": 8,
-  "versionName": "0.1.6",
-  "url": "https://github.com/appcraft-ltd/navigator-dwc/releases/download/v0.1.6-beta.1/fullsend-driver-0.1.6-arm64.apk",
-  "sha256": "7f8d44da9bf9f06feb70e127c8b3336fc16cc5c3e1425f129983dc28120cae90",
-  "size": 56482046
+  "versionCode": 9,
+  "versionName": "0.1.7",
+  "url": "https://github.com/appcraft-ltd/navigator-dwc/releases/download/v0.1.7-beta.1/fullsend-driver-0.1.7-arm64.apk",
+  "sha256": "ba489b55a6e4f640e99e10e79a3bf896a7abd4ab02f3fdd2a7edf3051fd79b3b",
+  "size": 56486450
 }
