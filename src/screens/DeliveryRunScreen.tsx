@@ -8,6 +8,7 @@ import useFocusedRefresh from '../hooks/use-focused-refresh';
 import useFleetbase from '../hooks/use-fleetbase';
 import { storage } from '../hooks/use-storage';
 import { useAuth } from '../contexts/AuthContext';
+import { openOsmAnd, pickupTime, runPickupPosition } from '../utils/run-pickup';
 import { runAcceptKey, runDistance, currentRunOrder, orderReference, runMapHtml } from '../utils/delivery-runs';
 
 export default function DeliveryRunScreen({ route, current = false }: any) {
@@ -45,15 +46,24 @@ export default function DeliveryRunScreen({ route, current = false }: any) {
         lock.current = true; setBusy(true); setError('');
         try {
             const latest = await refresh();
-            if (latest.accepted) return;
+            if (!latest || latest.accepted || currentOwner.current !== owner) return;
             const key = runAcceptKey(driver.id, id);
             let operationId = storage.getString(key);
             if (!operationId) { operationId = uuid(); storage.setString(key, operationId); }
-            apply(await adapter.post(`${base}/accept`, { operation_id: operationId }));
+            const location = latest.orders.some(order => order.meta?.cargodept_source === 'cargodept-v1')
+                ? await runPickupPosition() : undefined;
+            if (currentOwner.current !== owner) return;
+            apply(await adapter.post(`${base}/accept`, { operation_id: operationId, ...(location ? { location } : {}) }));
         } catch (err) {
             let recovered; try { recovered = await refresh(); } catch {}
             if (!recovered?.accepted && currentOwner.current === owner) setError(err.message || 'Unable to accept. Retry safely when connected.');
         } finally { lock.current = false; if (currentOwner.current === owner) setBusy(false); }
+    };
+    const pickup = run?.pickup_appointment;
+    const planned = pickup?.state === 'scheduled' && pickupTime(pickup.plannedAt);
+    const navigateToWarehouse = async () => {
+        try { await openOsmAnd(pickup.warehouse); }
+        catch { if (currentOwner.current === owner) setError('Install OsmAnd to open directions to the warehouse.'); }
     };
     const next = run && currentRunOrder(run);
     return <YStack flex={1} bg='$background'>
@@ -67,6 +77,11 @@ export default function DeliveryRunScreen({ route, current = false }: any) {
                     <Text color='$textSecondary'>{run.date} · {run.id}</Text>
                     <Text color='$textPrimary' fontSize='$7' fontWeight='700'>{runDistance(run)} · {run.stop_count} stops</Text>
                     <Text color='$textSecondary'>{run.orders.length} orders · {run.status === 'cancelled' ? 'Cancelled' : run.status === 'completed' ? 'Completed' : run.accepted ? 'Accepted' : 'Awaiting your acceptance'}</Text>
+                    {pickup && !['completed', 'cancelled'].includes(run.status) && <YStack gap='$2' p='$3' borderWidth={1} borderColor='$primaryBorder' borderRadius='$3'>
+                        <Text color='$textPrimary'>{planned ? 'Warehouse pickup · ' + planned + ' Dubai'
+                            : pickup.state === 'pending' ? 'Scheduling warehouse pickup…' : 'Dispatcher to review warehouse pickup'}</Text>
+                        {pickup.warehouse && <Button onPress={navigateToWarehouse}>Open warehouse in OsmAnd</Button>}
+                    </YStack>}
                     {current && next && <YStack gap='$2' p='$3' borderWidth={1} borderColor='$primaryBorder' borderRadius='$3'><Text color='$textSecondary'>Next order · {orderReference(next)}</Text><Button bg='$primary' onPress={() => navigation.navigate('Order', { order: next })}>Continue {orderReference(next)}</Button></YStack>}
                     <YStack height={270} borderRadius='$3' overflow='hidden'>
                         <WebView source={{ html: runMapHtml(run.stops), baseUrl: 'https://run-preview.local/' }} originWhitelist={['https://run-preview.local']} mixedContentMode='never' javaScriptCanOpenWindowsAutomatically={false} setSupportMultipleWindows={false} onShouldStartLoadWithRequest={r => r.url === 'about:blank' || r.url.startsWith('https://run-preview.local/')} />

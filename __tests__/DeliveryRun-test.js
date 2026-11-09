@@ -4,6 +4,8 @@ import {Text,AppState} from 'react-native';
 let mockMissingCurrent = false;
 let mockRun, mockLost, mockFailBeforeCommit, mockDriver='driver_one';
 const mockValues=new Map();
+const mockPickupPosition=jest.fn(),mockOpenWarehouse=jest.fn();
+jest.mock('../src/utils/run-pickup',()=>({...jest.requireActual('../src/utils/run-pickup'),runPickupPosition:mockPickupPosition,openOsmAnd:mockOpenWarehouse}));
 const mockNavigate=jest.fn(),mockBack=jest.fn();
 const mockAdapter={get:jest.fn(async(path)=>path.includes('view=current') ? (mockMissingCurrent ? {} : {run:mockRun?.accepted ? JSON.parse(JSON.stringify(mockRun)) : null}) : JSON.parse(JSON.stringify(mockRun))),post:jest.fn(async(path,data)=>{
  if(mockFailBeforeCommit) throw Error('Offline');
@@ -52,4 +54,25 @@ test('known empty Current Run links to Runs without fabricating a current assign
 });
 test('an unknown current-run response stays an error, not an empty assignment',async()=>{
  mockMissingCurrent=true;await mount(true);expect(labels(screen)).toContain('Cannot refresh');expect(labels(screen)).not.toContain('No current run');
+});
+
+test('accepted CargoDept run sends a fresh fix and opens the exact warehouse in OsmAnd',async()=>{
+ const location={latitude:25.04,longitude:55.12,accuracy:8,captured_at:'2026-11-07T08:00:00.000Z'};
+ const warehouse={lat:24.88,lng:55.13};
+ mockRun.orders.forEach(order=>{order.meta.cargodept_source='cargodept-v1';});
+ mockRun.pickup_appointment={state:'pending',warehouse};
+ mockPickupPosition.mockResolvedValueOnce(location);
+ await mount();await press('Accept delivery run');
+ expect(mockAdapter.post).toHaveBeenCalledWith('navigator/runs/manifest_one/accept',{operation_id:'retained-operation',location});
+ expect(labels(screen)).toContain('Scheduling warehouse pickup');
+ await press('Open warehouse in OsmAnd');
+ expect(mockOpenWarehouse).toHaveBeenCalledWith(warehouse);
+ expect(require('../src/utils/run-pickup').osmandUrl(warehouse)).toContain('finish=24.88,55.13&profile=car');
+});
+test('missing GPS leaves acceptance available for warehouse pickup review',async()=>{
+ mockRun.orders[0].meta.cargodept_source='cargodept-v1';
+ mockPickupPosition.mockResolvedValueOnce(undefined);
+ await mount();await press('Accept delivery run');
+ expect(mockAdapter.post).toHaveBeenCalledWith('navigator/runs/manifest_one/accept',{operation_id:'retained-operation'});
+ expect(labels(screen)).toContain('Accepted');
 });

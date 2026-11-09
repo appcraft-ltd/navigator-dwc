@@ -7,6 +7,10 @@ import { faPaperPlane, faPenToSquare, faFlagCheckered, faCheck, faBan } from '@f
 import { BlurView } from '@react-native-community/blur';
 import { PortalHost } from '@gorhom/portal';
 import LaunchNavigator from 'react-native-launch-navigator';
+import { WebView } from 'react-native-webview';
+import { openOsmAnd } from '../utils/run-pickup';
+import { runMapHtml } from '../utils/delivery-runs';
+import { placeCoordinate } from '../utils/known-coordinates';
 import FastImage from 'react-native-fast-image';
 import { Order, Place } from '@fleetbase/sdk';
 import { format as formatDate, formatDistance, add } from 'date-fns';
@@ -74,6 +78,8 @@ const OrderScreen = ({ route }) => {
     const { updateStorageOrder, setDimissedOrders } = useOrderManager();
     const { store, removeValue } = useTempStore();
     const [order, setOrder] = useState(new Order(params.order, adapter));
+    const cargoDeptRun = order.getAttribute('meta.cargodept_source') === 'cargodept-v1' &&
+        Boolean(order.getAttribute('meta.navigator_run_id'));
     const [activityLoading, setActivityLoading] = useState();
     const [distanceMatrix, setDistanceMatrix] = useState();
     const [nextActivity, setNextActivity] = useState([]);
@@ -111,6 +117,8 @@ const OrderScreen = ({ route }) => {
 
         return new Place(destination, adapter);
     }, [order, adapter]);
+    const runPoint = cargoDeptRun ? placeCoordinate(destination) : null;
+    const canNavigateRunPoint = runPoint && (runPoint.latitude !== 0 || runPoint.longitude !== 0);
 
     const entitiesByDestination = useMemo(() => {
         const waypoints = order.getAttribute('payload.waypoints', []) ?? [];
@@ -158,6 +166,16 @@ const OrderScreen = ({ route }) => {
     }, [order, adapter]);
 
     const startNavigation = useCallback(async () => {
+        if (cargoDeptRun) {
+            const point = placeCoordinate(destination);
+            if (!point || (point.latitude === 0 && point.longitude === 0)) {
+                Alert.alert('Destination unavailable', 'Ask the dispatcher to verify the stop pin.');
+                return;
+            }
+            try { await openOsmAnd({ lat: point.latitude, lng: point.longitude }); }
+            catch { Alert.alert('OsmAnd unavailable', 'Install OsmAnd to open directions to this stop.'); }
+            return;
+        }
         if (Platform.OS === 'android') {
             LaunchNavigator.setGoogleApiKey(config('GOOGLE_MAPS_API_KEY'));
         }
@@ -185,7 +203,7 @@ const OrderScreen = ({ route }) => {
                 }
             },
         });
-    }, [destination]);
+    }, [destination, cargoDeptRun]);
 
     const alertDestinationChanged = (previousDestination, currentDestination, order) => {
         return Alert.alert(
@@ -423,10 +441,10 @@ const OrderScreen = ({ route }) => {
     }, [adapter]);
 
     useEffect(() => {
-        if (order && !distanceLoadedRef.current) {
+        if (!cargoDeptRun && order && !distanceLoadedRef.current) {
             getDistanceMatrix();
         }
-    }, [order, getDistanceMatrix]);
+    }, [order, getDistanceMatrix, cargoDeptRun]);
 
     useEffect(() => {
         if (listenerRef.current) {
@@ -519,7 +537,14 @@ const OrderScreen = ({ route }) => {
                             </XStack>
                         </XStack>
                     </YStack>
-                    <LiveOrderRoute
+                    {cargoDeptRun ? (() => {
+                        const point = placeCoordinate(destination);
+                        return point && (point.latitude !== 0 || point.longitude !== 0) ?
+                            <WebView source={{ html: runMapHtml([{ lat: point.latitude, lng: point.longitude }]), baseUrl: 'https://run-preview.local/' }}
+                                originWhitelist={['https://run-preview.local']} mixedContentMode='never' javaScriptCanOpenWindowsAutomatically={false}
+                                setSupportMultipleWindows={false} onShouldStartLoadWithRequest={r => r.url === 'about:blank' || r.url.startsWith('https://run-preview.local/')} />
+                            : <YStack flex={1} justifyContent='center' alignItems='center'><Text>Destination pin unavailable</Text></YStack>;
+                    })() : <LiveOrderRoute
                         order={order}
                         zoom={4}
                         edgePaddingTop={80}
@@ -528,7 +553,7 @@ const OrderScreen = ({ route }) => {
                         edgePaddingRight={30}
                         focusCurrentDestination={isMultipleWaypointOrder}
                         currentDestination={destination}
-                    />
+                    />}
                 </YStack>
                 <ActionContainer space='$3'>
                     <DeliveryOrderActions key={order.id} order={order} onOrder={updateOrder} onManaged={setDeliveryManaged} />
@@ -576,7 +601,7 @@ const OrderScreen = ({ route }) => {
                         {isNavigatable && (
                             <Button onPress={startNavigation} bg='$info' borderWidth={1} borderColor='$infoBorder'>
                                 <Button.Icon>{isLoading('startNavigation') ? <SafeSpinner color={theme.infoText.val} /> : <FontAwesomeIcon icon={faPaperPlane} color={theme.infoText.val} />}</Button.Icon>
-                                <Button.Text color='$infoText'>Start Navigation</Button.Text>
+                                <Button.Text color='$infoText'>{cargoDeptRun ? 'Open stop in OsmAnd' : 'Start Navigation'}</Button.Text>
                             </Button>
                         )}
                     </XStack>
@@ -588,6 +613,7 @@ const OrderScreen = ({ route }) => {
                                 onChange={setOrderDestination}
                                 isLoading={isLoading('setOrderDestination')}
                                 snapTo='80%'
+                                showMap={!cargoDeptRun}
                             />
                         </YStack>
                     )}
@@ -684,7 +710,7 @@ const OrderScreen = ({ route }) => {
                     textColor={isDarkMode ? '$textPrimary' : '$white'}
                 />
             )}
-            <OrderActivitySelect
+            {!cargoDeptRun && <OrderActivitySelect
                 ref={activitySheetRef}
                 onChange={sendOrderActivityUpdate}
                 waypoint={destination}
@@ -693,7 +719,7 @@ const OrderScreen = ({ route }) => {
                 isLoading={isLoading('nextOrderActivity')}
                 snapTo='80%'
                 portalHost='OrderScreenPortal'
-            />
+            />}
             <PortalHost name='OrderScreenPortal' />
         </YStack>
     );

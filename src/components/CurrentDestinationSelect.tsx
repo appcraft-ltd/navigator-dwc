@@ -14,7 +14,7 @@ import Spacer from './Spacer';
 import useAppTheme from '../hooks/use-app-theme';
 import SafeSpinner from './SafeSpinner';
 
-const CurrentDestinationSelect = ({ onChange, destination, waypoints = [], snapTo = '100%', isLoading = false, ...props }) => {
+const CurrentDestinationSelect = ({ onChange, destination, waypoints = [], snapTo = '100%', isLoading = false, showMap = true, ...props }) => {
     const { isDarkMode } = useAppTheme();
     const theme = useTheme();
     const navigation = useNavigation();
@@ -43,9 +43,9 @@ const CurrentDestinationSelect = ({ onChange, destination, waypoints = [], snapT
             <Pressable onPress={openBottomSheet}>
                 <YStack bg={isDarkMode ? '$default' : '$gray-200'} borderWidth={1} borderColor={isDarkMode ? '$defaultBorder' : '$gray-300'} borderRadius='$4' px='$3' py='$3' {...props}>
                     <XStack>
-                        <YStack width={100} height={90}>
+                        {showMap && <YStack width={100} height={90}>
                             <PlaceMapView place={destination} zoom={2} markerSize='xs' width={100} height={90} borderWidth={1} borderColor='$borderColor' />
-                        </YStack>
+                        </YStack>}
                         <YStack flex={1} px='$3'>
                             {isLoading ? (
                                 <YStack flex={1} justifyContent='center'>

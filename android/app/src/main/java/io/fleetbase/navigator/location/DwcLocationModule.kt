@@ -4,6 +4,10 @@ import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.location.Location
+import android.location.LocationManager
+import android.net.Uri
+import android.os.CancellationSignal
+import androidx.core.location.LocationManagerCompat
 import android.os.Handler
 import android.os.Looper
 import androidx.core.content.ContextCompat
@@ -102,6 +106,54 @@ class DwcLocationModule(private val context: ReactApplicationContext) : ReactCon
             settled = true
             promise.reject("LOCATION_PERMISSION", "Location permission is required.")
         }
+    }
+
+    @ReactMethod fun getPickupPosition(promise: Promise) {
+        if (!hasPermission(context)) {
+            promise.reject("LOCATION_PERMISSION", "Location permission is required.")
+            return
+        }
+        val handler = Handler(Looper.getMainLooper())
+        val cancellation = CancellationSignal()
+        val timeout = Runnable {
+            cancellation.cancel()
+            promise.reject("LOCATION_TIMEOUT", "A current location is unavailable.")
+        }
+        handler.postDelayed(timeout, 4000)
+        try {
+            val manager = context.getSystemService(LocationManager::class.java)
+            val provider = listOf(LocationManager.GPS_PROVIDER, LocationManager.NETWORK_PROVIDER)
+                .firstOrNull { manager.isProviderEnabled(it) }
+                ?: throw IllegalStateException("Location provider unavailable.")
+            LocationManagerCompat.getCurrentLocation(manager, provider, cancellation, ContextCompat.getMainExecutor(context)) { fix ->
+                if (!cancellation.isCanceled) {
+                    handler.removeCallbacks(timeout)
+                    if (fix != null && fix.hasAccuracy()) promise.resolve(locationMap(fix))
+                    else promise.reject("LOCATION_UNAVAILABLE", "A current location is unavailable.")
+                }
+            }
+        } catch (_: Exception) {
+            handler.removeCallbacks(timeout)
+            promise.reject("LOCATION_UNAVAILABLE", "A current location is unavailable.")
+        }
+    }
+
+    @ReactMethod fun openOsmAnd(url: String, promise: Promise) {
+        val uri = Uri.parse(url)
+        if (uri.scheme != "https" || uri.authority != "osmand.net" || uri.path != "/map/" || uri.getQueryParameter("finish") == null) {
+            promise.reject("OSMAND_DESTINATION", "A warehouse destination is required.")
+            return
+        }
+        for (app in listOf("net.osmand", "net.osmand.plus", "net.osmand.dev")) {
+            try {
+                context.startActivity(Intent(Intent.ACTION_VIEW, uri).setPackage(app).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                promise.resolve(null)
+                return
+            } catch (_: android.content.ActivityNotFoundException) {
+                // Try the other OsmAnd editions.
+            }
+        }
+        promise.reject("OSMAND_UNAVAILABLE", "Install OsmAnd to open warehouse directions.")
     }
 
     companion object {
