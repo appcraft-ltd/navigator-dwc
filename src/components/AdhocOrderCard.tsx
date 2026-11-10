@@ -1,3 +1,4 @@
+import { orderReferences } from '../utils/delivery-runs';
 import React, { FC, useEffect, useState, useMemo, useCallback } from 'react';
 import { Pressable, Alert } from 'react-native';
 import { YStack, XStack, Text, Button, Spinner, styled, useTheme } from 'tamagui';
@@ -89,6 +90,7 @@ export const AdhocOrderCard = ({ order, onPress, onAccept, onDismiss }) => {
         ]);
     }, [order]);
 
+    const refs = orderReferences(order);
     return (
         <Pressable onPress={onPress}>
             <LoadingOverlay isVisible={isAccepting} text='Accepting and assigning order...' />
@@ -123,8 +125,9 @@ export const AdhocOrderCard = ({ order, onPress, onAccept, onDismiss }) => {
                             </XStack>
                             <YStack flex={1}>
                                 <Text color='$textPrimary' fontSize={16} fontWeight='bold'>
-                                    {order.getAttribute('tracking_number.tracking_number')}
+                                    {refs.primary}
                                 </Text>
+                                {!!refs.secondary && <Text color='$textSecondary' fontSize={12}>{refs.secondary}</Text>}
                                 <Text color='$textPrimary' fontSize={13}>
                                     {formatWhatsAppTimestamp(new Date(order.getAttribute('created_at')))}
                                 </Text>

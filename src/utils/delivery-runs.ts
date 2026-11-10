@@ -1,8 +1,22 @@
 export const runAcceptKey = (driverId: string, runId: string) => `delivery-run-accept:${driverId}:${runId}`;
-export const orderReference = (order: any) => {
-    const meta = order.meta || {};
-    return meta.cargodept_order_number || order.internal_id || order.id;
-};
+const referenceText = (value: unknown): value is string => typeof value === 'string' && value.length > 0 && value.length <= 160 && value === value.trim() && !/[\x00-\x1f\x7f]/.test(value);
+
+export function orderReferences(order: any) {
+    const read = (key: string) => typeof order.getAttribute === 'function' ? order.getAttribute(key) : key.split('.').reduce((value, part) => value?.[part], order);
+    const meta = read('meta');
+    const number = meta?.cargodept_order_number;
+    const doNumber = typeof number === 'string' && /^DO-[1-9][0-9]*$/.test(number) ? number : null;
+    const lists = meta?.cargodept_packing_lists;
+    const fallback = read('tracking_number.tracking_number') || read('tracking') || doNumber || order.id;
+    if (meta?.cargodept_source !== 'cargodept-v1' || !Array.isArray(lists) || !lists.length || lists.length > 1000 ||
+        lists.some(list => !referenceText(list?.number) || !referenceText(list?.customer_code))) {
+        return { customers: '', packingLists: '', primary: fallback, secondary: doNumber && doNumber !== fallback ? doNumber : null };
+    }
+    const customers = [...new Set(lists.map(list => list.customer_code))].join(', ');
+    const packingLists = 'PL ' + [...new Set(lists.map(list => list.number))].join(', ');
+    return { customers, packingLists, primary: customers + ' · ' + packingLists, secondary: doNumber };
+}
+
 export const runDistance = (run: any) => Number.isFinite(Number(run.distance_m)) && run.distance_m !== null
     ? `~${(Number(run.distance_m) / 1000).toFixed(1)} km` : 'Distance unavailable';
 export const currentRunOrder = (run: any) => run.orders.find((order: any) => !['completed', 'canceled'].includes(order.status));

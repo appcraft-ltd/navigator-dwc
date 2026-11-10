@@ -31,10 +31,10 @@ const press=async label=>{await act(async()=>button(screen,label).props.onPress(
 test('whole run preview retains dispatcher sequence, estimated km and all stops before one accept',async()=>{
  await mount();const text=labels(screen);expect(text).toContain('~12.4 km');expect(text).toContain('4');expect(text.indexOf('DO-42')).toBeLessThan(text.indexOf('DO-41'));expect(mockAdapter.post).not.toHaveBeenCalled();
  await press('Accept delivery run');expect(mockAdapter.post).toHaveBeenCalledTimes(1);expect(mockAdapter.post).toHaveBeenCalledWith('navigator/runs/manifest_one/accept',{operation_id:'retained-operation'});
- expect(labels(screen)).not.toContain('Accept delivery run');await press('Continue order · photo + GPS');expect(mockNavigate).toHaveBeenCalledWith('Order',{order:mockRun.orders[0]});
+ expect(labels(screen)).not.toContain('Accept delivery run');await press('Pick Up');expect(mockNavigate).toHaveBeenCalledWith('Order',{order:mockRun.orders[0]});
 });
 test('lost acceptance acknowledgement recovers accepted whole run without a second POST',async()=>{
- mockLost=true;await mount();await press('Accept delivery run');expect(labels(screen)).toContain('Accepted');expect(labels(screen)).not.toContain('Lost acknowledgement');expect(mockValues.size).toBe(0);expect(mockAdapter.post).toHaveBeenCalledTimes(1);
+ mockLost=true;await mount();await press('Accept delivery run');expect(labels(screen)).toContain('Run accepted');expect(labels(screen)).not.toContain('Lost acknowledgement');expect(mockValues.size).toBe(0);expect(mockAdapter.post).toHaveBeenCalledTimes(1);
 });
 test('unaccepted offline attempt retains exact operation across retry',async()=>{
  mockFailBeforeCommit=true;await mount();await press('Accept delivery run');expect(mockValues.get(runAcceptKey('driver_one','manifest_one'))).toBe('retained-operation');
@@ -45,8 +45,19 @@ test('route HTML never interpolates address HTML, auth or invalid coordinates',(
 });
 
 test('Current Run opens accepted tasks directly and has no second acceptance',async()=>{
- mockRun.accepted=true;mockRun.status='in_progress';await mount(true);
- expect(labels(screen)).toContain('Current Run');expect(labels(screen)).toContain('Continue order · photo + GPS');expect(labels(screen)).not.toContain('Accept delivery run');
+ mockRun.accepted=true;mockRun.status='in_progress';
+ mockRun.orders[0].meta={cargodept_source:'cargodept-v1',cargodept_order_number:'DO-42',cargodept_packing_lists:[{number:'00123',customer_code:'QAMG-0002'}]};
+ mockRun.stops[0].status='completed';await mount(true);
+ const text=labels(screen);
+ expect(text).toContain('Current Run');expect(text).not.toContain('Accept delivery run');
+ expect(text.indexOf('QAMG-0002')).toBeLessThan(text.indexOf('PL 00123'));
+ expect(text.indexOf('PL 00123')).toBeLessThan(text.indexOf('DO-42'));
+ expect(button(screen,'Drop Off').props.minHeight).toBeGreaterThanOrEqual(56);
+ expect(button(screen,'Pick Up')).toBeUndefined();
+ expect(text).toContain('UPCOMING');
+ expect(screen.root.findAll(n=>n.props.source?.html).length).toBe(0);
+ await press('Drop Off');expect(mockNavigate).toHaveBeenCalledWith('Order',{order:mockRun.orders[0]});
+ await press('Show route map');expect(screen.root.findAll(n=>n.props.source?.html).length).toBeGreaterThan(0);
  expect(mockAdapter.get).toHaveBeenCalledWith('navigator/runs?view=current');
 });
 test('known empty Current Run links to Runs without fabricating a current assignment',async()=>{
@@ -74,5 +85,5 @@ test('missing GPS leaves acceptance available for warehouse pickup review',async
  mockPickupPosition.mockResolvedValueOnce(undefined);
  await mount();await press('Accept delivery run');
  expect(mockAdapter.post).toHaveBeenCalledWith('navigator/runs/manifest_one/accept',{operation_id:'retained-operation'});
- expect(labels(screen)).toContain('Accepted');
+ expect(labels(screen)).toContain('Run accepted');
 });

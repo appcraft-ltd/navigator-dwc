@@ -9,7 +9,7 @@ import { PortalHost } from '@gorhom/portal';
 import LaunchNavigator from 'react-native-launch-navigator';
 import { WebView } from 'react-native-webview';
 import { openOsmAnd } from '../utils/run-pickup';
-import { runMapHtml } from '../utils/delivery-runs';
+import { orderReferences, runMapHtml } from '../utils/delivery-runs';
 import { placeCoordinate } from '../utils/known-coordinates';
 import FastImage from 'react-native-fast-image';
 import { Order, Place } from '@fleetbase/sdk';
@@ -78,6 +78,7 @@ const OrderScreen = ({ route }) => {
     const { updateStorageOrder, setDimissedOrders } = useOrderManager();
     const { store, removeValue } = useTempStore();
     const [order, setOrder] = useState(new Order(params.order, adapter));
+    const refs = orderReferences(order);
     const cargoDeptRun = order.getAttribute('meta.cargodept_source') === 'cargodept-v1' &&
         Boolean(order.getAttribute('meta.navigator_run_id'));
     const [activityLoading, setActivityLoading] = useState();
@@ -525,8 +526,9 @@ const OrderScreen = ({ route }) => {
                             <XStack flex={1} justifyContent='space-between'>
                                 <YStack flex={1}>
                                     <Text color={isDarkMode ? '$textPrimary' : '$gray-100'} fontSize={19} fontWeight='bold'>
-                                        {order.getAttribute('tracking_number.tracking_number')}
+                                        {refs.primary}
                                     </Text>
+                                    {!!refs.secondary && <Text color={isDarkMode ? '$textPrimary' : '$gray-200'} fontSize={13}>{refs.secondary}</Text>}
                                     <Text color={isDarkMode ? '$textPrimary' : '$gray-200'} fontSize={15}>
                                         {formatDate(new Date(order.getAttribute('created_at')), 'PP HH:mm')}
                                     </Text>
