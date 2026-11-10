@@ -107,7 +107,7 @@ export default function DeliveryRunScreen({ route, current = false }: any) {
                                 {String(i + 1).padStart(2, '0')} · {order.meta?.operation === 'collection' ? 'COLLECTION' : 'DELIVERY'}
                                 {terminal ? (order.status === 'completed' ? ' · COMPLETED' : ' · CANCELLED') : active && !ready ? ' · UPCOMING' : ''}
                             </Text>
-                            <Text color='$textPrimary' fontSize={22} lineHeight={27} fontWeight='700'>{refs.customers || refs.primary}{recipient ? ' / ' + recipient : ''}</Text>
+                            <Text color='$textPrimary' fontSize={22} lineHeight={27} fontWeight='700'>{refs.customers || refs.primary}{recipient && !refs.wholeTrip ? ' / ' + recipient : ''}</Text>
                             {!!refs.packingLists && <Text color='$textPrimary' fontSize={20} lineHeight={25} fontWeight='700'>{refs.packingLists}</Text>}
                             {!!refs.secondary && <Text color='$textSecondary' fontSize={13}>{refs.secondary}</Text>}
                             {!active && stops.map(stop => <Text key={stop.sequence} color='$textSecondary'>{stop.sequence}. {stop.type === 'pickup' ? 'Pickup' : 'Drop off'} · {stop.name || stop.address}{stop.name && stop.address ? ` · ${stop.address}` : ''}{stop.status === 'completed' ? ' ✓' : ''}</Text>)}

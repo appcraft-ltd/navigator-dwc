@@ -87,3 +87,16 @@ test('missing GPS leaves acceptance available for warehouse pickup review',async
  expect(mockAdapter.post).toHaveBeenCalledWith('navigator/runs/manifest_one/accept',{operation_id:'retained-operation'});
  expect(labels(screen)).toContain('Run accepted');
 });
+
+test('an assigned whole-trip stop shows the trip and omits multiple consignee references',async()=>{
+ mockRun.accepted=true;
+ mockRun.orders[0].meta={
+  cargodept_source:'cargodept-v1',cargodept_order_number:'DO-42',cargodept_trip_reference:{number:'10518'},
+  cargodept_packing_lists:[{number:'00123',customer_code:'ALPHA-07'},{number:'00124',customer_code:'BETA-08'}]
+ };
+ await mount();
+ expect(labels(screen)).toContain('Trip 10518');
+ expect(labels(screen)).toContain('DO-42');
+ expect(labels(screen)).not.toMatch(/ALPHA-07|BETA-08|PL 00123/);
+ expect(button(screen,'Pick Up')).toBeDefined();
+});

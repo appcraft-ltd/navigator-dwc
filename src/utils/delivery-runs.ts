@@ -12,7 +12,13 @@ export function orderReferences(order: any) {
         lists.some(list => !referenceText(list?.number) || !referenceText(list?.customer_code))) {
         return { customers: '', packingLists: '', primary: fallback, secondary: doNumber && doNumber !== fallback ? doNumber : null };
     }
-    const customers = [...new Set(lists.map(list => list.customer_code))].join(', ');
+    const codes = [...new Set(lists.map(list => list.customer_code))];
+    const trip = meta.cargodept_trip_reference;
+    if (trip && (trip.number === null || referenceText(trip.number))) {
+        const primary = trip.number ? ['Trip ' + trip.number, codes.length === 1 ? codes[0] : null].filter(Boolean).join(' · ') : doNumber || fallback;
+        return { customers: '', packingLists: '', primary, secondary: doNumber !== primary ? doNumber : null, wholeTrip: true };
+    }
+    const customers = codes.join(', ');
     const packingLists = 'PL ' + [...new Set(lists.map(list => list.number))].join(', ');
     return { customers, packingLists, primary: customers + ' · ' + packingLists, secondary: doNumber };
 }
