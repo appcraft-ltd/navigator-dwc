@@ -93,7 +93,7 @@ function createTabScreens() {
                 const { allActiveOrders } = useOrderManager();
 
                 return {
-                    tabBarLabel: isAndroid ? 'Runs' : config('DRIVER_ORDER_TAB_LABEL', 'Orders'),
+                    tabBarLabel: isAndroid ? 'Assignments' : config('DRIVER_ORDER_TAB_LABEL', 'Orders'),
                     tabBarBadge: isAndroid ? undefined : allActiveOrders.length,
                     tabBarBadgeStyle: {
                         marginRight: -5,
