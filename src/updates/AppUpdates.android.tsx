@@ -5,6 +5,7 @@ import * as Updates from 'expo-updates';
 import { checkChannels, describeUpdates } from './client';
 import { useAuth } from '../contexts/AuthContext';
 import { useLocation } from '../contexts/LocationContext';
+import { formatDubaiCreated } from '../utils/dubai-dates';
 
 const Context = createContext<any>(null);
 const native = NativeModules.DwcUpdates;
@@ -112,6 +113,7 @@ export function AppUpdatesCard() {
     const { isOnline } = useAuth();
     const { isTracking } = useLocation();
     if (!updates) return null;
+    const created = formatDubaiCreated(Updates.createdAt);
     const applyInterface = () => {
         if (isOnline || isTracking) {
             Alert.alert('Go offline first', 'Switch to Offline in Account before restarting to apply the update.');
@@ -135,6 +137,7 @@ export function AppUpdatesCard() {
             {!!updates.busy && <Spinner color='$textSecondary' />}
         </XStack>
         <Text color='$textSecondary'>{describeUpdates(updates)}</Text>
+        {!!created && <Text color='$textSecondary' fontSize='$3'>Installed interface created {created} · Dubai</Text>}
         {!!updates.apk && <Button disabled={!!updates.busy} onPress={updates.apkReady ? installAndroid : updates.downloadApk}>
             {updates.apkReady ? 'Install update' : `Download Android ${updates.apk.versionName}`}
         </Button>}

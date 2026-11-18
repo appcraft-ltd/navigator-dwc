@@ -9,7 +9,11 @@ const mockOrders = Array.from({length: 6}, (_, i) => ({
     meta: { cargodept_source: 'cargodept-v1', cargodept_order_number: `DO-${84 - i}`, cargodept_packing_lists: [{ customer_code: 'QECA-0001', number: `${285156 + i}` }] },
     payload: { pickup: {name: 'FFS DWC'}, dropoff: {name: `Destination ${i + 1}`} },
 }));
-const mockResponse = async path => path === 'orders' ? mockOrders : ({runs:[{id:path.includes('history')?'manifest_past':'manifest_new',date:'2026-11-07',status:path.includes('history')?'completed':'active',accepted:false,stop_count:4,order_count:2,distance_m:20000}],page:1,has_more:false});
+const mockPastOrder = { ...mockOrders[0], id: 'order_past', status: 'completed',
+    created_at: '2026-11-06T20:15:00Z',
+    meta: { ...mockOrders[0].meta, cargodept_order_number: 'DO-60', delivery_date: '2026-11-07' },
+};
+const mockResponse = async (path, params) => path === 'orders' ? (params?.status ? [mockPastOrder] : mockOrders) : ({runs:[{id:path.includes('history')?'manifest_past':'manifest_new',date:'2026-11-07',status:path.includes('history')?'completed':'active',accepted:false,stop_count:4,order_count:2,distance_m:20000}],page:1,has_more:false});
 const mockAdapter = { get: jest.fn(mockResponse) };
 jest.mock('../src/hooks/use-fleetbase', () => () => ({adapter: mockAdapter}));
 jest.mock('../src/contexts/AuthContext', () => ({useAuth: () => ({driver: mockDriverId ? {id: mockDriverId} : null})}));
@@ -36,14 +40,19 @@ test('opens assigned orders directly on home, including previous days, when no r
 });
 
 test('run members stay in their run while other orders remain directly visible', async () => {
-    mockAdapter.get.mockImplementation(async path => path === 'orders' ? [...mockOrders, {...mockOrders[0], id:'order_member', meta:{navigator_run_id:'manifest_new'}}] : mockResponse(path));
+    mockAdapter.get.mockImplementation(async (path, params) => path === 'orders' && params?.active ? [...mockOrders, {...mockOrders[0], id:'order_member', meta:{navigator_run_id:'manifest_new'}}] : mockResponse(path, params));
     await act(async () => {screen = Renderer.create(<Screen/>);});
-    expect(label()).toContain('Orders ·  6');
+    expect(label().match(/3 assignments/g)).toHaveLength(2);
     expect(label()).not.toContain('order_member');
     await press('Open delivery run');
     expect(mockNavigate).toHaveBeenCalledWith('DeliveryRun', {runId:'manifest_new'});
-    await press('Past runs');
-    expect(mockAdapter.get).toHaveBeenLastCalledWith('navigator/runs?summary=1&view=history&page=1');
+    await press('Past trips');
+    expect(mockAdapter.get).toHaveBeenCalledWith('navigator/runs?summary=1&view=history&page=1');
+    expect(mockAdapter.get).toHaveBeenCalledWith('orders', expect.objectContaining({
+        driver_assigned: 'driver_one', dispatched: true, status: expect.stringContaining('completed'),
+    }));
+    expect(label()).toContain('DO-60');
+    expect(label()).toContain('Created  7 Nov 2026, 00:15');
     expect(label()).toContain('Completed');
     expect(label()).not.toContain('DO-84');
     await press('View run');
@@ -73,11 +82,32 @@ test('malformed orders are an explicit error, while a successful empty pair show
     expect(label()).not.toContain('Cannot refresh');
 });
 
+test('today’s 15 deliveries appear before older open orders across Dubai midnight', async () => {
+    jest.useFakeTimers();
+    jest.setSystemTime(new Date('2026-11-17T21:00:00Z'));
+    const todayOrders = Array.from({length: 15}, (_, i) => ({
+        ...mockOrders[0],
+        id: `today_${i}`,
+        created_at: '2026-11-17T20:30:00Z',
+        meta: { ...mockOrders[0].meta, cargodept_order_number: `DO-${126 + i}` },
+    }));
+    try {
+        mockAdapter.get.mockImplementation(async (path, params) => path === 'orders' ? [...mockOrders, ...todayOrders] : mockResponse(path, params));
+        await act(async () => {screen = Renderer.create(<Screen/>);});
+        expect(label()).toContain('Today · 18 Nov 2026 15 assignments');
+        expect(label()).toContain('Created  18 Nov 2026, 00:30');
+        expect(label().indexOf('DO-140')).toBeLessThan(label().indexOf('DO-84'));
+        for (let i=126; i<=140; i++) expect(label()).toContain(`DO-${i}`);
+    } finally {
+        jest.useRealTimers();
+    }
+});
+
 test('late active response cannot replace selected history', async () => {
     let resolveActive;
     mockAdapter.get.mockImplementationOnce(() => new Promise(resolve => {resolveActive = resolve;}));
     await act(async () => {screen = Renderer.create(<Screen/>);});
-    await press('Past runs');
+    await press('Past trips');
     await act(async () => resolveActive({runs:[{id:'late-active',status:'active',order_count:99}],page:1,has_more:false}));
     expect(label()).toContain('Completed'); expect(label()).not.toContain('late-active');
 });

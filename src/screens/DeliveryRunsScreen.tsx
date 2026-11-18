@@ -6,6 +6,38 @@ import useFleetbase from '../hooks/use-fleetbase';
 import useFocusedRefresh from '../hooks/use-focused-refresh';
 import { useAuth } from '../contexts/AuthContext';
 import { orderReferences, runDistance } from '../utils/delivery-runs';
+import { dubaiDay, formatDay, formatDubaiCreated } from '../utils/dubai-dates';
+
+const pastStatuses = ['completed', 'canceled'];
+
+function groupAssignments(orders: any[], runs: any[], today: string | null, history: boolean) {
+    const groups = new Map<string | null, { day: string | null; orders: any[]; runs: any[] }>();
+    function group(day: string | null) {
+        const existing = groups.get(day);
+        if (existing) return existing;
+        const next = { day, orders: [] as any[], runs: [] as any[] };
+        groups.set(day, next);
+        return next;
+    }
+
+    for (const order of orders) {
+        const day = dubaiDay(order.meta?.delivery_date) ?? dubaiDay(order.scheduled_at) ?? dubaiDay(order.created_at);
+        group(day).orders.push(order);
+    }
+    for (const run of runs) group(dubaiDay(run.date)).runs.push(run);
+
+    return [...groups.values()].sort((a, b) => {
+        if (a.day === b.day) return 0;
+        if (!a.day) return 1;
+        if (!b.day) return -1;
+        if (!history && today) {
+            if (a.day === today) return -1;
+            if (b.day === today) return 1;
+            if (a.day > today && b.day > today) return a.day.localeCompare(b.day);
+        }
+        return b.day.localeCompare(a.day);
+    });
+}
 
 const orderStatus = (status: string) => status === 'enroute' ? 'In progress' : status.charAt(0).toUpperCase() + status.slice(1).replaceAll('_', ' ');
 const placeLabel = (place: any) => place?.name || place?.street1 || place?.address || 'Address unavailable';
@@ -49,16 +81,18 @@ export default function DeliveryRunsScreen() {
     }, [adapter, driverId, scope, view, isCurrent]);
 
     const fetchOrders = useCallback(async () => {
-        if (!adapter || !driverId || view !== 'active') return;
+        if (!adapter || !driverId) return;
         const ticket = ++ordersRequestId.current;
         setOrdersBusy(true); setOrdersError(null);
         try {
-            // Use the existing driver assignment query across all dates. Run members
-            // remain in their run, with its existing acceptance and execution flow.
-            const next = await adapter.get('orders', { driver_assigned: driverId, active: true, limit: -1, sort: '-created_at' });
+            const statusFilter = view === 'active'
+                ? { active: true }
+                : { dispatched: true, status: pastStatuses.join(',') };
+            const next = await adapter.get('orders', { driver_assigned: driverId, ...statusFilter, limit: -1, sort: '-created_at' });
             if (!Array.isArray(next) || next.some(order => !order || typeof order.id !== 'string' || typeof order.status !== 'string')) throw new Error('Order list unavailable.');
             if (!isCurrent() || ticket !== ordersRequestId.current) return;
-            const orders = next.filter(order => !order.meta?.navigator_run_id);
+            const orders = next.filter(order => !order.meta?.navigator_run_id
+                && (view === 'active' || pastStatuses.includes(order.status)));
             setOrdersData({ scope, adapter, orders: [...new Map(orders.map(order => [order.id, order])).values()] });
         } catch {
             if (isCurrent() && ticket === ordersRequestId.current) setOrdersError({ scope, adapter, message: 'Cannot refresh assigned orders. Pull down to retry.' });
@@ -67,41 +101,54 @@ export default function DeliveryRunsScreen() {
     const refresh = useCallback(() => Promise.all([fetchPage(1), fetchOrders()]), [fetchPage, fetchOrders]);
     useFocusedRefresh(refresh, view === 'history' ? 0 : 30000);
 
+    const history = view === 'history';
+    const today = dubaiDay(new Date());
+    const groups = groupAssignments(visibleOrders ?? [], visible?.runs ?? [], today, history);
+    const loaded = visible && visibleOrders && !runError && !orderError;
+
     return <YStack flex={1} bg='$background' pt='$5'>
-        <ScrollView refreshControl={<RefreshControl refreshing={busy || (view === 'active' && ordersBusy)} onRefresh={refresh} />}>
+        <ScrollView refreshControl={<RefreshControl refreshing={busy || ordersBusy} onRefresh={refresh} />}>
             <YStack px='$4' py='$4' gap='$4'>
                 <Text color='$textPrimary' fontSize='$8' fontWeight='700'>Assignments</Text>
                 <XStack gap='$2'>
-                    <Button bg={view === 'active' ? '$primary' : '$surface'} accessibilityRole='tab' accessibilityState={{ selected: view === 'active' }} onPress={() => setView('active')}>New & active</Button>
-                    <Button bg={view === 'history' ? '$primary' : '$surface'} accessibilityRole='tab' accessibilityState={{ selected: view === 'history' }} onPress={() => setView('history')}>Past runs</Button>
+                    <Button flex={1} bg={!history ? '$primary' : '$surface'} color={!history ? '$white' : '$textPrimary'} accessibilityRole='tab' accessibilityState={{ selected: !history }} onPress={() => setView('active')}>Active trips</Button>
+                    <Button flex={1} bg={history ? '$primary' : '$surface'} color={history ? '$white' : '$textPrimary'} accessibilityRole='tab' accessibilityState={{ selected: history }} onPress={() => setView('history')}>Past trips</Button>
                 </XStack>
-                <Text color='$textSecondary'>{view === 'history' ? 'Your completed and cancelled runs, newest first.' : 'All your assigned orders and runs. Open an assignment to continue.'}</Text>
-                {view === 'active' && <>
-                    {!!orderError && <Text color='$errorText' accessibilityLiveRegion='polite'>{orderError}</Text>}
-                    {!visibleOrders && !orderError && <Text color='$textSecondary'>Loading orders…</Text>}
-                    {!!visibleOrders?.length && <Text color='$textPrimary' fontSize='$6' fontWeight='700'>Orders · {visibleOrders.length}</Text>}
-                    {visibleOrders?.map(order => {
+                {!!orderError && <Text color='$errorText' accessibilityLiveRegion='polite'>{orderError}</Text>}
+                {!!runError && <Text color='$errorText' accessibilityLiveRegion='polite'>{runError}</Text>}
+                {!visibleOrders && !orderError && <Text color='$textSecondary'>Loading orders…</Text>}
+                {!visible && !runError && <Text color='$textSecondary'>Loading runs…</Text>}
+                {loaded && !groups.length && <Text color='$textSecondary'>{history ? 'No past trips yet.' : 'No active assignments yet.'}</Text>}
+                {!!groups.length && <Text color='$textSecondary' fontSize='$3'>Dates in Dubai time</Text>}
+                {groups.map(({ day, orders, runs }) => <YStack key={day ?? 'undated'} gap='$3'>
+                    <XStack justifyContent='space-between' alignItems='center' gap='$2'>
+                        <Text color='$textPrimary' fontSize='$5' fontWeight='700' accessibilityRole='header'>
+                            {day ? `${day === today ? 'Today · ' : ''}${formatDay(day)}` : 'Date unavailable'}
+                        </Text>
+                        <Text color='$textSecondary' fontSize='$3'>
+                            {`${orders.length + runs.length} ${orders.length + runs.length === 1 ? 'assignment' : 'assignments'}`}
+                        </Text>
+                    </XStack>
+                    {runs.map(run => <YStack key={run.id} p='$4' gap='$2' borderWidth={1} borderColor='$borderColor' borderRadius='$4'>
+                        <Text color='$textPrimary' fontSize='$6' fontWeight='700'>Delivery run</Text>
+                        <Text color='$textSecondary'>{run.status === 'completed' ? 'Completed' : run.status === 'cancelled' ? 'Cancelled' : run.accepted ? 'Accepted' : 'New run'}</Text>
+                        <Text color='$textPrimary'>{runDistance(run)} · {run.stop_count} stops · {run.order_count} orders</Text>
+                        <Text color='$textSecondary' fontSize='$2'>{run.id}</Text>
+                        <Button bg='$primary' color='$white' accessibilityRole='button' onPress={() => navigation.navigate('DeliveryRun', { runId: run.id })}>{history ? 'View run' : 'Open delivery run'}</Button>
+                    </YStack>)}
+                    {orders.map(order => {
                         const refs = orderReferences(order);
+                        const created = formatDubaiCreated(order.created_at);
                         return <YStack key={order.id} p='$4' gap='$2' borderWidth={1} borderColor='$borderColor' borderRadius='$4'>
                             <Text color='$textPrimary' fontSize='$6' fontWeight='700'>{refs.primary}</Text>
                             {!!refs.secondary && <Text color='$textSecondary'>{refs.secondary}</Text>}
                             <Text color='$textSecondary'>{orderStatus(order.status)}</Text>
+                            {!!created && <Text color='$textSecondary' fontSize='$3'>Created {created}</Text>}
                             <Text color='$textPrimary'>Pickup: {placeLabel(order.payload?.pickup)}</Text>
                             <Text color='$textPrimary'>Drop-off: {placeLabel(order.payload?.dropoff)}</Text>
-                            <Button bg='$primary' color='$white' accessibilityRole='button' onPress={() => navigation.navigate('Order', { order })}>Open order</Button>
+                            <Button bg='$primary' color='$white' accessibilityRole='button' onPress={() => navigation.navigate('Order', { order })}>{history ? 'View order' : 'Open order'}</Button>
                         </YStack>;
                     })}
-                </>}
-                {!!runError && <Text color='$errorText' accessibilityLiveRegion='polite'>{runError}</Text>}
-                {!visible && !runError && <Text color='$textSecondary'>Loading runs…</Text>}
-                {view === 'active' && visible && visibleOrders && !visible.runs.length && !visibleOrders.length && !runError && !orderError && <Text color='$textSecondary'>No active assignments yet.</Text>}
-                {view === 'history' && visible && !visible.runs.length && !runError && <Text color='$textSecondary'>No past runs yet.</Text>}
-                {view === 'active' && !!visible?.runs.length && <Text color='$textPrimary' fontSize='$6' fontWeight='700'>Runs</Text>}
-                {visible?.runs.map(run => <YStack key={run.id} p='$4' gap='$2' borderWidth={1} borderColor='$borderColor' borderRadius='$4'>
-                    <Text color='$textPrimary' fontSize='$6' fontWeight='700'>{run.date} · {run.status === 'completed' ? 'Completed' : run.status === 'cancelled' ? 'Cancelled' : run.accepted ? 'Accepted' : 'New run'}</Text>
-                    <Text color='$textPrimary'>{runDistance(run)} · {run.stop_count} stops · {run.order_count} orders</Text>
-                    <Text color='$textSecondary' fontSize='$2'>{run.id}</Text>
-                    <Button bg='$primary' color='$white' accessibilityRole='button' onPress={() => navigation.navigate('DeliveryRun', { runId: run.id })}>{view === 'history' ? 'View run' : 'Open delivery run'}</Button>
                 </YStack>)}
                 {visible?.hasMore && <Button disabled={busy} onPress={() => fetchPage(visible.page + 1)}>Load more runs</Button>}
             </YStack>

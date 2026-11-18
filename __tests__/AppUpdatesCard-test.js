@@ -10,7 +10,7 @@ let mockLocation = { isTracking: false };
 jest.mock('../src/contexts/AuthContext', () => ({ useAuth: () => mockAuth }));
 jest.mock('../src/contexts/LocationContext', () => ({ useLocation: () => mockLocation }));
 jest.mock('expo-updates', () => ({
-    isEnabled: true, checkForUpdateAsync: jest.fn(), fetchUpdateAsync: jest.fn(), reloadAsync: jest.fn(),
+    isEnabled: true, createdAt: new Date('2026-11-17T20:05:00Z'), checkForUpdateAsync: jest.fn(), fetchUpdateAsync: jest.fn(), reloadAsync: jest.fn(),
     useUpdates: () => ({ isUpdatePending: false }),
 }));
 jest.mock('tamagui', () => {
@@ -42,6 +42,7 @@ test('automatic Wi-Fi download never reloads a working app', async () => {
     expect(Updates.fetchUpdateAsync).toHaveBeenCalledTimes(1);
     expect(Updates.reloadAsync).not.toHaveBeenCalled();
     expect(text(screen)).toContain('next time the app starts');
+    expect(text(screen)).toContain('Installed interface created  18 Nov 2026, 00:05  · Dubai');
 });
 test('automatic checks do not download interface assets on metered data', async () => {
     mockNative.isUnmetered.mockResolvedValue(false);
