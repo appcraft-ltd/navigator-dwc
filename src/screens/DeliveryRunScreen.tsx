@@ -62,6 +62,7 @@ export default function DeliveryRunScreen({ route, current = false }: any) {
     };
     const pickup = run?.pickup_appointment;
     const planned = pickup?.state === 'scheduled' && pickupTime(pickup.plannedAt);
+    const dropoffs = run?.dropoff_appointments;
     const navigateToWarehouse = async () => {
         try { await openOsmAnd(pickup.warehouse); }
         catch { if (currentOwner.current === owner) setError('Install OsmAnd to open directions to the warehouse.'); }
@@ -88,6 +89,8 @@ export default function DeliveryRunScreen({ route, current = false }: any) {
                             : pickup.state === 'pending' ? 'Scheduling warehouse pickup…' : 'Dispatcher to review warehouse pickup'}</Text>
                         {pickup.warehouse && <Button onPress={navigateToWarehouse}>Open warehouse in OsmAnd</Button>}
                     </YStack>}
+                    {active && dropoffs?.state === 'pending' && <Text color='$textSecondary'>Scheduling Dock arrivals…</Text>}
+                    {active && dropoffs?.state === 'attention' && <Text color='$errorText'>Dispatcher to review Dock arrivals</Text>}
                     {!active && <>
                         <Text color='$textSecondary'>{runDistance(run)} · {run.stop_count} stops</Text>
                         {map()}
@@ -103,6 +106,9 @@ export default function DeliveryRunScreen({ route, current = false }: any) {
                         const ready = active && next?.id === order.id;
                         const terminal = ['completed', 'canceled'].includes(order.status);
                         const action = remaining?.type === 'pickup' ? 'Pick Up' : remaining?.type === 'dropoff' ? 'Drop Off' : 'Continue order';
+                        const dockArrival = dropoffs?.state === 'scheduled' &&
+                            dropoffs.appointments?.find((appointment: {orderId: string; plannedAt: string}) => appointment.orderId === order.id);
+                        const dockTime = dockArrival && pickupTime(dockArrival.plannedAt);
                         return <YStack key={order.id} p='$4' gap='$2' bg='$surface' borderWidth={1} borderColor='$borderColor' borderRadius='$4'>
                             <XStack flexWrap='wrap' alignItems='center' gap='$2'>
                                 <Text color='$textSecondary' fontSize={13} fontWeight='700'>
@@ -114,6 +120,7 @@ export default function DeliveryRunScreen({ route, current = false }: any) {
                             <Text color='$textPrimary' fontSize={22} lineHeight={27} fontWeight='700'>{refs.customers || refs.primary}{recipient && !refs.wholeTrip ? ' / ' + recipient : ''}</Text>
                             {!!refs.packingLists && <Text color='$textPrimary' fontSize={20} lineHeight={25} fontWeight='700'>{refs.packingLists}</Text>}
                             {!!refs.secondary && <Text color='$textSecondary' fontSize={13}>{refs.secondary}</Text>}
+                            {active && !terminal && dockTime && <Text color='$textSecondary'>Dock arrival estimate · {dockTime} Dubai</Text>}
                             {!active && stops.map(stop => <Text key={stop.sequence} color='$textSecondary'>{stop.sequence}. {stop.type === 'pickup' ? 'Pickup' : 'Drop off'} · {stop.name || stop.address}{stop.name && stop.address ? ` · ${stop.address}` : ''}{stop.status === 'completed' ? ' ✓' : ''}</Text>)}
                             {ready ? <Button minHeight={56} mt='$2' bg='$blue-600' accessibilityLabel={action + ' · ' + refs.primary} onPress={() => navigation.navigate('Order', { order })}>
                                 <Button.Text color='white' fontSize={20} fontWeight='700'>{action}</Button.Text>
