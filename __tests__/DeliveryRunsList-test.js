@@ -7,7 +7,9 @@ const mockOrders = Array.from({length: 6}, (_, i) => ({
     id: `order_${i}`, status: i === 3 ? 'enroute' : 'dispatched',
     created_at: i < 3 ? '2026-11-11T10:23:00Z' : '2026-11-10T10:12:00Z',
     meta: { cargodept_source: 'cargodept-v1', operation: i === 1 ? 'collection' : i === 2 ? undefined : 'delivery', cargodept_order_number: `DO-${84 - i}`, cargodept_packing_lists: [{ customer_code: 'QECA-0001', number: `${285156 + i}` }] },
-    payload: { pickup: {name: 'FFS DWC'}, dropoff: {name: `Destination ${i + 1}`} },
+    payload: i === 1
+        ? { pickup: {name: 'Supplier warehouse'}, dropoff: {name: 'FFS DWC'} }
+        : { pickup: {name: 'FFS DWC'}, dropoff: {name: `Destination ${i + 1}`} },
 }));
 const mockPastOrder = { ...mockOrders[0], id: 'order_past', status: 'completed',
     created_at: '2026-11-06T20:15:00Z',
