@@ -1,3 +1,4 @@
+import OrderDirectionBadge from '../components/OrderDirectionBadge';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ScrollView, RefreshControl } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
@@ -132,6 +133,10 @@ export default function DeliveryRunsScreen() {
                     {runs.map(run => <YStack key={run.id} p='$4' gap='$2' borderWidth={1} borderColor='$borderColor' borderRadius='$4'>
                         <Text color='$textPrimary' fontSize='$6' fontWeight='700'>Delivery run</Text>
                         <Text color='$textSecondary'>{run.status === 'completed' ? 'Completed' : run.status === 'cancelled' ? 'Cancelled' : run.accepted ? 'Accepted' : 'New run'}</Text>
+                        {(run.delivery_count > 0 || run.collection_count > 0) && <XStack flexWrap='wrap' gap='$2'>
+                            {run.delivery_count > 0 && <OrderDirectionBadge operation='delivery' count={run.delivery_count} />}
+                            {run.collection_count > 0 && <OrderDirectionBadge operation='collection' count={run.collection_count} />}
+                        </XStack>}
                         <Text color='$textPrimary'>{runDistance(run)} · {run.stop_count} stops · {run.order_count} orders</Text>
                         <Text color='$textSecondary' fontSize='$2'>{run.id}</Text>
                         <Button bg='$primary' color='$white' accessibilityRole='button' onPress={() => navigation.navigate('DeliveryRun', { runId: run.id })}>{history ? 'View run' : 'Open delivery run'}</Button>
@@ -142,7 +147,10 @@ export default function DeliveryRunsScreen() {
                         return <YStack key={order.id} p='$4' gap='$2' borderWidth={1} borderColor='$borderColor' borderRadius='$4'>
                             <Text color='$textPrimary' fontSize='$6' fontWeight='700'>{refs.primary}</Text>
                             {!!refs.secondary && <Text color='$textSecondary'>{refs.secondary}</Text>}
-                            <Text color='$textSecondary'>{orderStatus(order.status)}</Text>
+                            <XStack flexWrap='wrap' alignItems='center' gap='$2'>
+                                <OrderDirectionBadge order={order} />
+                                <Text color='$textSecondary'>{orderStatus(order.status)}</Text>
+                            </XStack>
                             {!!created && <Text color='$textSecondary' fontSize='$3'>Created {created}</Text>}
                             <Text color='$textPrimary'>Pickup: {placeLabel(order.payload?.pickup)}</Text>
                             <Text color='$textPrimary'>Drop-off: {placeLabel(order.payload?.dropoff)}</Text>

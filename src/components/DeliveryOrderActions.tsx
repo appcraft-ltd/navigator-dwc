@@ -1,3 +1,4 @@
+import OrderDirectionBadge, { orderOperation } from './OrderDirectionBadge';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Modal } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
@@ -89,14 +90,16 @@ export default function DeliveryOrderActions({ order, onOrder, onManaged }) {
     };
 
     if (state?.enabled === false) return null;
+    const operation = orderOperation(order);
+    const operationLabel = operation === 'collection' ? 'Collection' : operation === 'delivery' ? 'Delivery' : 'Order';
     const title = state?.next === 'accept' ? 'Accept order' : state?.next === 'pickup' ? 'Confirm pickup' : 'Confirm drop off';
     return <YStack gap='$3' width='100%' py='$2'>
-        <Text color='$textPrimary' fontSize='$5' fontWeight='700'>Delivery confirmation</Text>
+        <Text color='$textPrimary' fontSize='$5' fontWeight='700'>{operationLabel} confirmation</Text>
         <Text color='$textSecondary'>{state?.run ? 'Pickup photo + GPS → Drop off photo + GPS' : '1. Accept → 2. Pickup photo + GPS → 3. Drop off photo + GPS'}</Text>
         {!!state?.run?.blocked_reason && <Text color='$textSecondary'>{state.run.blocked_reason}</Text>}
         {state?.stop && <Text color='$textPrimary'>Stop {state.stop.sequence}: {state.stop.name || state.stop.address || state.stop.id}</Text>}
-        {!state && <Button disabled={!!busy} onPress={() => refresh().catch(() => setError('Unable to check order. Please retry.'))}>Refresh delivery steps</Button>}
-        {state?.terminal && <Text color='$textSecondary'>{state.order.status === 'completed' ? 'Delivery completed' : 'Order canceled'}</Text>}
+        {!state && <Button disabled={!!busy} onPress={() => refresh().catch(() => setError('Unable to check order. Please retry.'))}>Refresh order steps</Button>}
+        {state?.terminal && <Text color='$textSecondary'>{state.order.status === 'completed' ? operationLabel + ' completed' : 'Order canceled'}</Text>}
         {Object.entries(state?.proofs || {}).map(([stage, proof]: any) => <YStack key={stage} gap='$2'>
             <Text color='$textPrimary'>{proof.data.stage === 'pickup' ? 'Pickup confirmed' : 'Drop off confirmed'}{proof.data.stop?.sequence ? ` · Stop ${proof.data.stop.sequence}` : ''} · GPS saved</Text>
             <Image source={{ uri: proof.url }} width={120} height={90} borderRadius='$3' />
@@ -115,7 +118,10 @@ export default function DeliveryOrderActions({ order, onOrder, onManaged }) {
         {!!error && <Text accessibilityLiveRegion='polite' color='$errorText'>{error}</Text>}
         <Modal visible={camera} onRequestClose={() => setCamera(false)} animationType='slide'>
             <YStack flex={1} bg='$background' pt='$5'>
-                <XStack px='$4' py='$3' alignItems='center' justifyContent='space-between'><Text color='$textPrimary'>{title} · Photo</Text><Button onPress={() => setCamera(false)}>Cancel</Button></XStack>
+                <XStack px='$4' py='$3' alignItems='center' justifyContent='space-between' gap='$2'>
+                    <YStack gap='$1'><Text color='$textPrimary'>{title} · Photo</Text><OrderDirectionBadge order={order} /></YStack>
+                    <Button onPress={() => setCamera(false)}>Cancel</Button>
+                </XStack>
                 <CameraCapture onDone={capture} maxPhotos={1} allowGallery={false} />
             </YStack>
         </Modal>

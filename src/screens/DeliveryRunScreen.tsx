@@ -1,3 +1,4 @@
+import OrderDirectionBadge from '../components/OrderDirectionBadge';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ScrollView, RefreshControl } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
@@ -103,10 +104,13 @@ export default function DeliveryRunScreen({ route, current = false }: any) {
                         const terminal = ['completed', 'canceled'].includes(order.status);
                         const action = remaining?.type === 'pickup' ? 'Pick Up' : remaining?.type === 'dropoff' ? 'Drop Off' : 'Continue order';
                         return <YStack key={order.id} p='$4' gap='$2' bg='$surface' borderWidth={1} borderColor='$borderColor' borderRadius='$4'>
-                            <Text color='$textSecondary' fontSize={13} fontWeight='700'>
-                                {String(i + 1).padStart(2, '0')} · {order.meta?.operation === 'collection' ? 'COLLECTION' : 'DELIVERY'}
-                                {terminal ? (order.status === 'completed' ? ' · COMPLETED' : ' · CANCELLED') : active && !ready ? ' · UPCOMING' : ''}
-                            </Text>
+                            <XStack flexWrap='wrap' alignItems='center' gap='$2'>
+                                <Text color='$textSecondary' fontSize={13} fontWeight='700'>
+                                    {String(i + 1).padStart(2, '0')}
+                                    {terminal ? (order.status === 'completed' ? ' · COMPLETED' : ' · CANCELLED') : active && !ready ? ' · UPCOMING' : ''}
+                                </Text>
+                                <OrderDirectionBadge order={order} />
+                            </XStack>
                             <Text color='$textPrimary' fontSize={22} lineHeight={27} fontWeight='700'>{refs.customers || refs.primary}{recipient && !refs.wholeTrip ? ' / ' + recipient : ''}</Text>
                             {!!refs.packingLists && <Text color='$textPrimary' fontSize={20} lineHeight={25} fontWeight='700'>{refs.packingLists}</Text>}
                             {!!refs.secondary && <Text color='$textSecondary' fontSize={13}>{refs.secondary}</Text>}

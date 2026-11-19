@@ -1,3 +1,4 @@
+import OrderDirectionBadge from './OrderDirectionBadge';
 import { orderReferences } from '../utils/delivery-runs';
 import React, { FC, useEffect, useState, useMemo } from 'react';
 import { Pressable } from 'react-native';
@@ -45,6 +46,7 @@ export const OrderCard = ({ order, onPress }) => {
                                 {refs.primary}
                             </Text>
                             {!!refs.secondary && <Text color='$textSecondary' fontSize={12}>{refs.secondary}</Text>}
+                            <OrderDirectionBadge order={order} />
                             <Text color='$textPrimary' fontSize={12}>
                                 {formatDate(new Date(order.getAttribute('created_at')), 'PP HH:mm')}
                             </Text>

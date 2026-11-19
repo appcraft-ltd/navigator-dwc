@@ -1,3 +1,4 @@
+import OrderDirectionBadge from '../components/OrderDirectionBadge';
 import { useState, useRef, useCallback } from 'react';
 import { useNavigation } from '@react-navigation/native';
 import { Image, Text, YStack, XStack, Spinner, useTheme } from 'tamagui';
@@ -115,7 +116,7 @@ const ProofOfDeliveryScreen = ({ route }) => {
         return (
             <YStack bg='transparent' flex={1}>
                 <LoadingOverlay visible={isLoading} text={loadingOverlayMessage} textColor={isDarkMode ? '$textPrimary' : '$white'} />
-                <CustomHeader headerTransparent={true} headerShadowVisible={false} headerLeft={<BackButton />} headerLeftStyle={{ paddingLeft: 10 }} />
+                <CustomHeader headerTransparent={true} headerShadowVisible={false} headerLeft={<BackButton />} headerRight={<OrderDirectionBadge order={order} />} headerRightStyle={{ paddingRight: 10 }} headerLeftStyle={{ paddingLeft: 10 }} />
                 <QrCodeScanner onScan={handleQrCodeScan} />
             </YStack>
         );
@@ -128,7 +129,7 @@ const ProofOfDeliveryScreen = ({ route }) => {
                 <CustomHeader
                     headerTransparent={true}
                     headerShadowVisible={false}
-                    headerLeft={<BackButton />}
+                    headerLeft={<BackButton />} headerRight={<OrderDirectionBadge order={order} />} headerRightStyle={{ paddingRight: 10 }}
                     headerLeftStyle={{ paddingLeft: 10 }}
                     headerStyle={{ position: 'absolute', top: 0, left: 0, right: 0 }}
                 />
@@ -141,7 +142,7 @@ const ProofOfDeliveryScreen = ({ route }) => {
         return (
             <YStack bg='$white' flex={1}>
                 <LoadingOverlay visible={isLoading} text={loadingOverlayMessage} textColor={isDarkMode ? '$textPrimary' : '$white'} />
-                <CustomHeader headerTransparent={true} headerShadowVisible={false} headerLeft={<BackButton />} headerLeftStyle={{ paddingLeft: 10 }} />
+                <CustomHeader headerTransparent={true} headerShadowVisible={false} headerLeft={<BackButton />} headerRight={<OrderDirectionBadge order={order} />} headerRightStyle={{ paddingRight: 10 }} headerLeftStyle={{ paddingLeft: 10 }} />
                 <SignatureCanvas
                     ref={signatureScreenRef}
                     onOK={handleSignatureCompleted}

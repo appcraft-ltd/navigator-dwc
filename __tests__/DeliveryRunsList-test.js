@@ -6,14 +6,16 @@ let mockDriverId = 'driver_one';
 const mockOrders = Array.from({length: 6}, (_, i) => ({
     id: `order_${i}`, status: i === 3 ? 'enroute' : 'dispatched',
     created_at: i < 3 ? '2026-11-11T10:23:00Z' : '2026-11-10T10:12:00Z',
-    meta: { cargodept_source: 'cargodept-v1', cargodept_order_number: `DO-${84 - i}`, cargodept_packing_lists: [{ customer_code: 'QECA-0001', number: `${285156 + i}` }] },
-    payload: { pickup: {name: 'FFS DWC'}, dropoff: {name: `Destination ${i + 1}`} },
+    meta: { cargodept_source: 'cargodept-v1', operation: i === 1 ? 'collection' : i === 2 ? undefined : 'delivery', cargodept_order_number: `DO-${84 - i}`, cargodept_packing_lists: [{ customer_code: 'QECA-0001', number: `${285156 + i}` }] },
+    payload: i === 1
+        ? { pickup: {name: 'Supplier warehouse'}, dropoff: {name: 'FFS DWC'} }
+        : { pickup: {name: 'FFS DWC'}, dropoff: {name: `Destination ${i + 1}`} },
 }));
 const mockPastOrder = { ...mockOrders[0], id: 'order_past', status: 'completed',
     created_at: '2026-11-06T20:15:00Z',
     meta: { ...mockOrders[0].meta, cargodept_order_number: 'DO-60', delivery_date: '2026-11-07' },
 };
-const mockResponse = async (path, params) => path === 'orders' ? (params?.status ? [mockPastOrder] : mockOrders) : ({runs:[{id:path.includes('history')?'manifest_past':'manifest_new',date:'2026-11-07',status:path.includes('history')?'completed':'active',accepted:false,stop_count:4,order_count:2,distance_m:20000}],page:1,has_more:false});
+const mockResponse = async (path, params) => path === 'orders' ? (params?.status ? [mockPastOrder] : mockOrders) : ({runs:[{id:path.includes('history')?'manifest_past':'manifest_new',date:'2026-11-07',status:path.includes('history')?'completed':'active',accepted:false,stop_count:4,order_count:2,delivery_count:1,collection_count:1,distance_m:20000}],page:1,has_more:false});
 const mockAdapter = { get: jest.fn(mockResponse) };
 jest.mock('../src/hooks/use-fleetbase', () => () => ({adapter: mockAdapter}));
 jest.mock('../src/contexts/AuthContext', () => ({useAuth: () => ({driver: mockDriverId ? {id: mockDriverId} : null})}));
@@ -32,6 +34,8 @@ test('opens assigned orders directly on home, including previous days, when no r
     expect(mockAdapter.get).toHaveBeenCalledWith('orders', {driver_assigned:'driver_one',active:true,limit:-1,sort:'-created_at'});
     for (let i=0; i<6; i++) expect(label()).toContain(`DO-${84-i}`);
     expect(label()).toContain('In progress');
+    expect(screen.root.findAllByType(Text).filter(node => node.props.accessibilityLabel === 'Collection, to FFS DWC')).toHaveLength(1);
+    expect(screen.root.findAllByType(Text).filter(node => node.props.accessibilityLabel === 'Delivery, from FFS DWC')).toHaveLength(4);
     expect(label()).not.toContain('No active assignments');
     expect(label()).not.toContain('Standalone orders');
     expect(label()).not.toContain('No delivery runs assigned');
@@ -44,6 +48,8 @@ test('run members stay in their run while other orders remain directly visible',
     await act(async () => {screen = Renderer.create(<Screen/>);});
     expect(label().match(/3 assignments/g)).toHaveLength(2);
     expect(label()).not.toContain('order_member');
+    expect(label()).toContain('Delivery · 1');
+    expect(label()).toContain('Collection · 1');
     await press('Open delivery run');
     expect(mockNavigate).toHaveBeenCalledWith('DeliveryRun', {runId:'manifest_new'});
     await press('Past trips');
