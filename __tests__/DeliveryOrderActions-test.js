@@ -39,7 +39,7 @@ const button=(screen,title)=>screen.root.findAll(n=>typeof n.type==='function' &
 let screen;
 beforeEach(()=>{jest.clearAllMocks();mockValues.clear();mockListeners.clear();mockUploadFails=false;mockState={enabled:true,next:'accept',step_key:'accept',terminal:false,receipts:{},proofs:{},order:{id:'order_one',status:'dispatched'}}});
 afterEach(async()=>{if(screen)await act(async()=>screen.unmount());screen=null;});
-async function mount(){await act(async()=>{screen=Renderer.create(<DeliveryActions order={{id:'order_one'}} onOrder={()=>{}} onManaged={()=>{}}/>)});}
+async function mount(operation='delivery'){await act(async()=>{screen=Renderer.create(<DeliveryActions order={{id:'order_one',meta:{cargodept_source:'cargodept-v1',operation}}} onOrder={()=>{}} onManaged={()=>{}}/>)});}
 async function press(title){await act(async()=>button(screen,title).props.onPress());}
 async function photo(){await act(async()=>screen.root.findByType(Capture).props.onDone([{uri:'capture.jpg'}]));}
 test('explicit Accept, Pickup photo/GPS and Drop off photo/GPS remain separate steps',async()=>{
@@ -49,6 +49,11 @@ test('explicit Accept, Pickup photo/GPS and Drop off photo/GPS remain separate s
  await press('Send pickup confirmation');expect(label(screen)).toContain('Pickup confirmed');expect(label(screen)).toContain('Confirm drop off');
  await press('Confirm drop off');await photo();await press('Send drop off confirmation');
  expect(label(screen)).toContain('Delivery completed');expect(label(screen)).toContain('Drop off confirmed');expect(utils.sendMultipart).toHaveBeenCalledTimes(2);
+});
+test('collection keeps the direction on the photo step',async()=>{
+ await mount('collection');expect(label(screen)).toMatch(/Collection\s+confirmation/);await press('Accept order');
+ await press('Confirm pickup');
+ expect(screen.root.findAllByType(Text).some(node=>node.props.accessibilityLabel==='Collection, to FFS DWC')).toBe(true);
 });
 test('a lost upload response is recovered by receipt readback without duplicate submission',async()=>{
  await mount();await press('Accept order');await press('Confirm pickup');await photo();mockUploadFails=true;

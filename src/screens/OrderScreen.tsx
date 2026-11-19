@@ -1,3 +1,4 @@
+import OrderDirectionBadge from '../components/OrderDirectionBadge';
 import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { useNavigation } from '@react-navigation/native';
 import { ScrollView, RefreshControl, SafeAreaView, StyleSheet, Alert, Platform } from 'react-native';
@@ -535,6 +536,7 @@ const OrderScreen = ({ route }) => {
                                 </YStack>
                                 <YStack>
                                     <Badge status={order.getAttribute('status')} />
+                                    <OrderDirectionBadge order={order} />
                                 </YStack>
                             </XStack>
                         </XStack>

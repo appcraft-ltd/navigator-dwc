@@ -100,3 +100,12 @@ test('an assigned whole-trip stop shows the trip and omits multiple consignee re
  expect(labels(screen)).not.toMatch(/ALPHA-07|BETA-08|PL 00123/);
  expect(button(screen,'Pick Up')).toBeDefined();
 });
+
+test('mixed run labels each verified order without guessing an unknown direction',async()=>{
+ mockRun.orders[0].meta = {...mockRun.orders[0].meta,cargodept_source:'cargodept-v1',operation:'collection'};
+ mockRun.orders[1].meta = {...mockRun.orders[1].meta,cargodept_source:'cargodept-v1',operation:'delivery'};
+ mockRun.orders.push({id:'order_unknown',status:'dispatched',meta:{cargodept_order_number:'DO-43',operation:'delivery'}});
+ await mount();
+ const directions = screen.root.findAllByType(Text).map(node=>node.props.accessibilityLabel).filter(Boolean);
+ expect(directions).toEqual(['Collection, to FFS DWC','Delivery, from FFS DWC']);
+});
