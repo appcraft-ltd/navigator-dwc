@@ -1,4 +1,4 @@
-import OrderDirectionBadge from '../components/OrderDirectionBadge';
+import OrderDirectionBadge, { orderIsNew } from '../components/OrderDirectionBadge';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ScrollView, RefreshControl } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
@@ -43,6 +43,38 @@ function groupAssignments(orders: any[], runs: any[], today: string | null, hist
 const orderStatus = (status: string) => status === 'enroute' ? 'In progress' : status.charAt(0).toUpperCase() + status.slice(1).replaceAll('_', ' ');
 const placeLabel = (place: any) => place?.name || place?.street1 || place?.address || 'Address unavailable';
 
+type NewOrders = { date: string; delivery: number; collection: number };
+const directions = ['delivery', 'collection'] as const;
+const validCount = (value: unknown): value is number => Number.isSafeInteger(value) && (value as number) >= 0;
+
+function NewOrderNotice({ counts }: { counts: NewOrders | null }) {
+    if (!counts || !(counts.delivery || counts.collection)) return null;
+
+    return <YStack testID='new-orders-notice' accessibilityLiveRegion='polite' px='$4' pt='$3' pb='$2' gap='$2'>
+        <Text color='$textPrimary' fontSize='$4' fontWeight='700'>Assigned today</Text>
+        <XStack flexWrap='wrap' gap='$2'>
+            {directions.map(operation => counts[operation] > 0
+                ? <OrderDirectionBadge key={operation} operation={operation} count={counts[operation]} isNew />
+                : null)}
+        </XStack>
+    </YStack>;
+}
+
+function RunDirections({ run, showNew }: { run: any; showNew: boolean }) {
+    const badges = directions.flatMap(operation => {
+        const count = run[operation + '_count'];
+        if (!validCount(count) || !count) return [];
+        const newCount = run['new_' + operation + '_count'];
+        const fresh = showNew && validCount(newCount) ? Math.min(count, newCount) : 0;
+        const existing = count - fresh;
+        return [
+            existing ? <OrderDirectionBadge key={operation} operation={operation} count={existing} /> : null,
+            fresh ? <OrderDirectionBadge key={'new-' + operation} operation={operation} count={fresh} isNew /> : null,
+        ];
+    });
+    return badges.length ? <XStack flexWrap='wrap' gap='$2'>{badges}</XStack> : null;
+}
+
 export default function DeliveryRunsScreen() {
     const { adapter } = useFleetbase();
     const { driver } = useAuth();
@@ -50,6 +82,8 @@ export default function DeliveryRunsScreen() {
     const [view, setView] = useState('active');
     const [data, setData] = useState<any>();
     const [ordersData, setOrdersData] = useState<any>();
+    const [notice, setNotice] = useState<{ driverId: string; adapter: unknown; counts: NewOrders }>();
+    const [today, setToday] = useState(() => dubaiDay(new Date()));
     const [busy, setBusy] = useState(false);
     const [ordersBusy, setOrdersBusy] = useState(false);
     const [error, setError] = useState<any>();
@@ -65,6 +99,12 @@ export default function DeliveryRunsScreen() {
     const runError = error?.scope === scope && error.adapter === adapter ? error.message : '';
     const orderError = ordersError?.scope === scope && ordersError.adapter === adapter ? ordersError.message : '';
     useEffect(() => () => { ++requestId.current; ++ordersRequestId.current; }, []);
+    useEffect(() => {
+        if (!today) return;
+        const nextDay = Date.parse(today + 'T00:00:00+04:00') + 86400000;
+        const timer = setTimeout(() => setToday(dubaiDay(new Date())), Math.max(0, nextDay - Date.now()));
+        return () => clearTimeout(timer);
+    }, [today]);
 
     const fetchPage = useCallback(async (page = 1) => {
         if (!adapter || !driverId) return;
@@ -74,7 +114,13 @@ export default function DeliveryRunsScreen() {
             const next = await adapter.get(`navigator/runs?summary=1&view=${view}&page=${page}`);
             if (!Array.isArray(next.runs) || !Number.isInteger(next.page) || typeof next.has_more !== 'boolean') throw new Error('Run list unavailable.');
             if (!isCurrent() || ticket !== requestId.current) return;
-            setData(previous => ({ scope, adapter, page: next.page, hasMore: next.has_more,
+            const counts = next.new_orders;
+            if (page === 1) {
+                setToday(dubaiDay(new Date()));
+                setNotice(counts && typeof counts.date === 'string' && validCount(counts.delivery) && validCount(counts.collection)
+                    ? { driverId, adapter, counts } : undefined);
+            }
+            setData(previous => ({ scope, adapter, page: next.page, hasMore: next.has_more, newDate: counts?.date,
                 runs: page === 1 ? next.runs : [...(previous?.scope === scope && previous.adapter === adapter ? previous.runs : []), ...next.runs.filter(run => !previous?.runs?.some(row => row.id === run.id))] }));
         } catch {
             if (isCurrent() && ticket === requestId.current) setError({ scope, adapter, message: 'Cannot load delivery runs. Pull down to retry.' });
@@ -103,11 +149,12 @@ export default function DeliveryRunsScreen() {
     useFocusedRefresh(refresh, view === 'history' ? 0 : 30000);
 
     const history = view === 'history';
-    const today = dubaiDay(new Date());
+    const currentNotice = notice && notice.driverId === driverId && notice.adapter === adapter && notice.counts.date === today ? notice.counts : null;
     const groups = groupAssignments(visibleOrders ?? [], visible?.runs ?? [], today, history);
     const loaded = visible && visibleOrders && !runError && !orderError;
 
     return <YStack flex={1} bg='$background' pt='$5'>
+        <NewOrderNotice counts={currentNotice} />
         <ScrollView refreshControl={<RefreshControl refreshing={busy || ordersBusy} onRefresh={refresh} />}>
             <YStack px='$4' py='$4' gap='$4'>
                 <Text color='$textPrimary' fontSize='$8' fontWeight='700'>Assignments</Text>
@@ -133,10 +180,7 @@ export default function DeliveryRunsScreen() {
                     {runs.map(run => <YStack key={run.id} p='$4' gap='$2' borderWidth={1} borderColor='$borderColor' borderRadius='$4'>
                         <Text color='$textPrimary' fontSize='$6' fontWeight='700'>Delivery run</Text>
                         <Text color='$textSecondary'>{run.status === 'completed' ? 'Completed' : run.status === 'cancelled' ? 'Cancelled' : run.accepted ? 'Accepted' : 'New run'}</Text>
-                        {(run.delivery_count > 0 || run.collection_count > 0) && <XStack flexWrap='wrap' gap='$2'>
-                            {run.delivery_count > 0 && <OrderDirectionBadge operation='delivery' count={run.delivery_count} />}
-                            {run.collection_count > 0 && <OrderDirectionBadge operation='collection' count={run.collection_count} />}
-                        </XStack>}
+                        <RunDirections run={run} showNew={visible?.newDate === today} />
                         <Text color='$textPrimary'>{runDistance(run)} · {run.stop_count} stops · {run.order_count} orders</Text>
                         <Text color='$textSecondary' fontSize='$2'>{run.id}</Text>
                         <Button bg='$primary' color='$white' accessibilityRole='button' onPress={() => navigation.navigate('DeliveryRun', { runId: run.id })}>{history ? 'View run' : 'Open delivery run'}</Button>
@@ -148,7 +192,7 @@ export default function DeliveryRunsScreen() {
                             <Text color='$textPrimary' fontSize='$6' fontWeight='700'>{refs.primary}</Text>
                             {!!refs.secondary && <Text color='$textSecondary'>{refs.secondary}</Text>}
                             <XStack flexWrap='wrap' alignItems='center' gap='$2'>
-                                <OrderDirectionBadge order={order} />
+                                <OrderDirectionBadge order={order} isNew={orderIsNew(order, today)} />
                                 <Text color='$textSecondary'>{orderStatus(order.status)}</Text>
                             </XStack>
                             {!!created && <Text color='$textSecondary' fontSize='$3'>Created {created}</Text>}

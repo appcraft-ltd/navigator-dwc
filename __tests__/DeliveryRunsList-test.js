@@ -130,3 +130,34 @@ test('driver change hides old assignments and ignores their delayed response', a
     expect(label()).not.toContain('DO-84');
     expect(label()).toContain('No active assignments yet.');
 });
+
+test('new dispatch notice survives opening and completing orders until midnight in Dubai', async () => {
+    jest.useFakeTimers();
+    jest.setSystemTime(new Date('2026-11-20T19:59:30Z'));
+    const delivery = { ...mockOrders[0], dispatched_at: '2026-11-19T20:00:00Z' };
+    const collection = { ...mockOrders[1], dispatched_at: '2026-11-20T12:00:00Z' };
+    const old = { ...mockOrders[3], dispatched_at: '2026-11-19T19:59:59Z' };
+    const done = { ...collection, status: 'completed' };
+    mockAdapter.get.mockImplementation(async (path, params) => path === 'orders'
+        ? (params?.active ? [delivery, collection, old] : [done])
+        : ({ runs: [], page: 1, has_more: false, new_orders: { date: '2026-11-20', delivery: 1, collection: 1 } }));
+    try {
+        await act(async () => { screen = Renderer.create(<Screen />); });
+        expect(label()).toContain('Assigned today');
+        expect(label()).toContain('New delivery · 1');
+        expect(label()).toContain('New collection · 1');
+        expect(screen.root.findAllByType(Text).filter(node => node.props.accessibilityLabel === 'New delivery, from FFS DWC')).toHaveLength(1);
+        await press('Open order');
+        expect(label()).toContain('Assigned today');
+        await press('Past trips');
+        expect(label()).toContain('New collection · 1');
+        expect(label()).toContain('Completed');
+        expect(screen.root.findAllByType(Text).filter(node => node.props.accessibilityLabel === 'New collection, to FFS DWC')).toHaveLength(1);
+        await act(async () => { jest.advanceTimersByTime(30000); });
+        expect(label()).not.toContain('Assigned today');
+        expect(label()).not.toContain('New collection');
+        expect(label()).toContain('Collection');
+    } finally {
+        jest.useRealTimers();
+    }
+});
